@@ -41,6 +41,7 @@ else:
 # handle arguments
 
 fname = ''
+label = ''
 
 if '.tar' not in sys.argv[1]:
 
@@ -63,6 +64,8 @@ if '.tar' not in sys.argv[1]:
 		print('%s[!]%s No files found matching %s%s%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET))
 		exit(-1)
 
+	label = '%s_%s' % (image, tag)
+
 else:
 
 	# handle file name
@@ -72,6 +75,11 @@ else:
 	if not os.path.isfile(fname):
 		print('%s[!]%s %s%s%s is not an existing file.' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET))
 		exit(-1)
+
+	label = fname[:fname.find('.tar')]
+
+	if label.startswith('rootfs_'):
+		label = label[len('rootfs_'):]
 
 # sanity checks
 
@@ -123,7 +131,7 @@ except subprocess.CalledProcessError as err:
 
 # get /etc/{passwd,shadow} entries
 
-print('%s[*]%s Fetching %s/etc/{passwd,shadow}%s entries for user %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
+print('%s[*]%s Reading %s/etc/{passwd,shadow}%s entries for user %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
 
 etcpasswd = ''
 etcshadow = ''
@@ -164,6 +172,8 @@ lsfname = '/mnt/' + lsfname[0].lower() + '/' + lsfname[3:].replace('\\', '/')
 
 try:
 	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~ && mkdir -p rootfs-temp && cd rootfs-temp && cp %s .' % lsfname])
+	pass
+
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to copy archive to WSL: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
@@ -172,6 +182,8 @@ print('%s[*]%s Beginning extraction...' % (Fore.GREEN, Fore.RESET))
 
 try:
 	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && tar xfp %s' % fname])
+	pass
+
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to extract archive in WSL: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
@@ -186,17 +198,30 @@ except:
 print('%s[*]%s Waiting for the Linux subsystem to exit...' % (Fore.GREEN, Fore.RESET))
 
 while True:
-	time.sleep(1)
+	time.sleep(5)
 
 	if not os.path.exists(os.path.join(basedir, 'temp')):
 		break
+
+# read label of current distribution
+
+clabel = ''
+
+try:
+	with open(os.path.join(basedir, 'rootfs', '.switch_label')) as f:
+		clabel = f.readline().strip()
+
+except OSError as err:
+	clabel = 'ubuntu_trusty'
+	print('%s[!]%s No %s/.switch_label%s found, assuming current rootfs is %subuntu%s:%strusty%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
 
 # do the switch
 
 print('%s[*]%s Backing up current %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 try:
-	subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs-old')])
+	subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs_' + clabel)])
+
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
@@ -205,12 +230,14 @@ print('%s[*]%s Switching to new %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.B
 
 try:
 	subprocess.check_call(['cmd', '/C', 'move', os.path.join(homedirw, 'rootfs-temp'), os.path.join(basedir, 'rootfs')])
+
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to switch to new %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	print('%s[*]%s Rolling back to old %srootfs%s...' % (Fore.YELLOW, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 	try:
-		subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs-old'), os.path.join(basedir, 'rootfs')])
+		subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + clabel), os.path.join(basedir, 'rootfs')])
+
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 		print('%s[!]%s You are now the proud owner of one broken Linux subsystem! To fix it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
@@ -236,3 +263,10 @@ try:
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/etc/shadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
+
+try:
+	with open(os.path.join(basedir, 'rootfs', '.switch_label'), 'w') as f:
+		f.write(label + '\n')
+
+except OSError as err:
+	print('%s[!]%s Failed to open file %s/.switch_label%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
