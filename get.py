@@ -9,14 +9,15 @@ if len(sys.argv) < 2:
 
 image = sys.argv[1]
 tag   = 'latest'
-dfurl = ''
-tgurl = ''
-fname = 'rootfs_%s_%s' % (image, tag)
 
 if ':' in image:
 	idx   = image.find(':')
 	tag   = image[idx + 1:]
 	image = image[:idx]
+
+dfurl = ''
+tgurl = ''
+fname = 'rootfs_%s_%s' % (image, tag)
 
 # try to get colors, but don't make it a nuisance by requiring dependencies
 
