@@ -53,7 +53,7 @@ print('%s[*]%s Fetching official-images info for %s%s%s:%s%s%s...' % (Fore.GREEN
 try:
 	with urllib.request.urlopen('https://raw.githubusercontent.com/docker-library/official-images/master/library/' + image) as f:
 
-		data = f.read().decode('utf-8').splitlines()
+		data = f.read().decode('utf-8').splitlines() + ['']
 
 		# there seems to be two versions for this file:
 		#  a) simplistic one-line per tag:
@@ -80,9 +80,12 @@ try:
 				commit = line[1]
 				repo   = repo[repo.find('github.com/') + len('github.com/') : repo.find('.git')]
 
+				if len(path) != 0:
+					path = '/' + path
+
 				# build direct URL to Dockerfile
 
-				dfurl = 'https://raw.githubusercontent.com/%s/%s/%s/Dockerfile' % (repo, commit, path)
+				dfurl = 'https://raw.githubusercontent.com/%s/%s%s/Dockerfile' % (repo, commit, path)
 				break
 
 		# try b) second
@@ -99,9 +102,9 @@ try:
 					# tags are separated by double new lines and we need to wait for all values
 					# before building the direct URL
 
-					if isTag and repo and path and commit:
+					if isTag and repo and commit:
 
-						dfurl = 'https://raw.githubusercontent.com/%s/%s/%s/Dockerfile' % (repo, commit, path)
+						dfurl = 'https://raw.githubusercontent.com/%s/%s%s/Dockerfile' % (repo, commit, path)
 						break
 
 					else:
@@ -123,7 +126,7 @@ try:
 					commit = line[1]
 
 				elif line[0] == 'Directory':
-					path = line[1]
+					path = '/' + line[1]
 
 		# otherwise, fail miserably
 
