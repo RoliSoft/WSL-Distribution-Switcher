@@ -2,6 +2,7 @@
 # coding=utf-8
 import sys
 import glob
+import time
 import shutil
 import os.path
 import subprocess
@@ -117,46 +118,71 @@ except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
 
+# remove old remnants
+
+if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
+	print('%s[*]%s Removing leftover %srootfs-temp%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
+
+	shutil.rmtree(os.path.join(homedirw, 'rootfs-temp'), True)
+
 # move archive and extract it
 
 print('%s[*]%s Copying %s%s%s to %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, fname, Fore.RESET, Fore.GREEN, homedirw, Fore.RESET))
 
+lsfname = os.path.abspath(fname)
+lsfname = '/mnt/' + lsfname[0].lower() + '/' + lsfname[3:].replace('\\', '/')
+
 try:
-	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~ && mkdir -p rootfs-temp && cd rootfs-temp && cp /mnt/c/Users/RoliSoft/Desktop/wsl-distrib/%s .' % fname])
+	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~ && mkdir -p rootfs-temp && cd rootfs-temp && cp %s .' % lsfname])
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to copy archive to WSL: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
 
-# Input/output error
-
-#shutil.copyfile(fname, os.path.join(homedirw, 'rootfs-temp', fname))
-#shutil.copyfileobj(fname, os.path.join(homedirw, 'rootfs-temp', fname))
-#with open(fname, 'rb') as src, open(os.path.join(homedirw, 'rootfs-temp', fname), 'wb') as dst:
-#	shutil.copyfileobj(src, dst)
-
 print('%s[*]%s Beginning extraction...' % (Fore.GREEN, Fore.RESET))
 
 try:
-	#subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && tar xfp %s' % (fname)])
-	pass
+	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && tar xfp %s' % fname])
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to extract archive in WSL: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
 
-os.unlink(os.path.join(homedirw, 'rootfs-temp', fname))
+try:
+	os.unlink(os.path.join(homedirw, 'rootfs-temp', fname))
+except:
+	pass
+
+# wait for WSL to exit
+
+print('%s[*]%s Waiting for the Linux subsystem to exit...' % (Fore.GREEN, Fore.RESET))
+
+while True:
+	time.sleep(1)
+
+	if not os.path.exists(os.path.join(basedir, 'temp')):
+		break
 
 # do the switch
 
 print('%s[*]%s Backing up current %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
 
-#shutil.move(os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs-old'))
-
 try:
-	subprocess.check_call(['move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs-old')])
+	subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs-old')])
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
 
 print('%s[*]%s Switching to new %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
 
-#shutil.move(os.path.join(homedir, 'rootfs-temp'), os.path.join(basedir, 'rootfs'))
+try:
+	subprocess.check_call(['cmd', '/C', 'move', os.path.join(homedirw, 'rootfs-temp'), os.path.join(basedir, 'rootfs')])
+except subprocess.CalledProcessError as err:
+	print('%s[!]%s Failed to switch to new %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+	print('%s[*]%s Rolling back to old %srootfs%s...' % (Fore.YELLOW, Fore.RESET, Fore.BLUE, Fore.RESET))
+
+	try:
+		subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs-old'), os.path.join(basedir, 'rootfs')])
+	except subprocess.CalledProcessError as err:
+		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+		print('%s[!]%s You are now the proud owner of one broken Linux subsystem! To fix it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
+
+	exit(-1)
