@@ -202,7 +202,7 @@ except urllib.error.HTTPError as err:
 	exit(-1)
 
 except OSError as err:
-	print('%s[!]%s Failed open file %s%s%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET, err))
+	print('%s[!]%s Failed to open file %s%s%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET, err))
 	exit(-1)
 
 print('%s[*]%s Rootfs archive for %s%s%s:%s%s%s saved to %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET, Fore.GREEN, fname, Fore.RESET))

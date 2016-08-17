@@ -87,6 +87,7 @@ if os.path.exists(os.path.join(basedir, 'temp')):
 	print('%s[!]%s The Linux subsystem is currently running. Please kill all instances before continuing.' % (Fore.RED, Fore.RESET))
 	exit(-1)
 
+user     = ''
 homedir  = ''
 homedirw = ''
 
@@ -95,7 +96,7 @@ homedirw = ''
 # ref: https://github.com/Microsoft/BashOnWindows/issues/2
 
 try:
-	ret = subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'echo $HOME > /tmp/.wsl_usr.txt'])
+	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
 	out = os.path.join(basedir, 'rootfs/tmp/.wsl_usr.txt')
 
 	if not os.path.isfile(out):
@@ -110,12 +111,41 @@ try:
 			print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
 			exit(-1)
 
-	print('%s[*]%s Home directory is at %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.BLUE, homedir, Fore.BLUE))
+		user = f.readline().strip()
+
+	print('%s[*]%s Home directory is at %s%s%s for user %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.BLUE, homedir, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
 
 	os.unlink(out)
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
+	exit(-1)
+
+# get /etc/{passwd,shadow} entries
+
+print('%s[*]%s Fetching %s/etc/{passwd,shadow}%s entries for user %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
+
+etcpasswd = ''
+etcshadow = ''
+
+try:
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd')) as f:
+		for line in f.readlines():
+			if line.startswith(user + ':'):
+				etcpasswd = line.strip()
+
+except OSError as err:
+	print('%s[!]%s Failed to open file %s/etc/passwd%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+	exit(-1)
+
+try:
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow')) as f:
+		for line in f.readlines():
+			if line.startswith(user + ':'):
+				etcshadow = line.strip()
+
+except OSError as err:
+	print('%s[!]%s Failed to open file %s/etc/shadow%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
 
 # remove old remnants
@@ -127,7 +157,7 @@ if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
 
 # move archive and extract it
 
-print('%s[*]%s Copying %s%s%s to %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, fname, Fore.RESET, Fore.GREEN, homedirw, Fore.RESET))
+print('%s[*]%s Copying %s%s%s to %s%s/rootfs-temp%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, fname, Fore.RESET, Fore.GREEN, homedir, Fore.RESET))
 
 lsfname = os.path.abspath(fname)
 lsfname = '/mnt/' + lsfname[0].lower() + '/' + lsfname[3:].replace('\\', '/')
@@ -185,4 +215,24 @@ except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 		print('%s[!]%s You are now the proud owner of one broken Linux subsystem! To fix it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
 
+	exit(-1)
+
+# append user entries to /etc/{passwd,shadow}
+
+print('%s[*]%s Writing entries of user %s%s%s to %s/etc/{passwd,shadow}%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET, Fore.BLUE, Fore.RESET))
+
+try:
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), 'a') as f:
+		f.write(etcpasswd + '\n')
+
+except OSError as err:
+	print('%s[!]%s Failed to open file %s/etc/passwd%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+	exit(-1)
+
+try:
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), 'a') as f:
+		f.write(etcshadow + '\n')
+
+except OSError as err:
+	print('%s[!]%s Failed to open file %s/etc/shadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
