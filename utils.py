@@ -16,6 +16,11 @@ if sys.platform == 'win32':
 	except ImportError:
 		pass
 
+	import ctypes
+
+	class ConsoleCursorInfo(ctypes.Structure):
+		_fields_ = [("size", ctypes.c_int), ("visible", ctypes.c_byte)]
+
 if not sys.platform == 'win32' or has_filter:
 	class Fore:
 		RED    = '\x1B[91m'
@@ -61,7 +66,7 @@ def parse_image_arg(argv, can_be_file = False):
 			image = image[:idx]
 
 		if can_be_file:
-			fname = 'rootfs_%s_%s.tar*' % (image, tag)
+			fname = 'rootfs_%s_%s.tar*' % (image.replace('/', '_'), tag)
 			names = glob.glob(fname)
 
 			if len(names) > 0:
@@ -71,9 +76,9 @@ def parse_image_arg(argv, can_be_file = False):
 				exit(-1)
 
 		else:
-			fname = 'rootfs_%s_%s' % (image, tag)
+			fname = 'rootfs_%s_%s' % (image.replace('/', '_'), tag)
 
-		label = '%s_%s' % (image, tag)
+		label = '%s_%s' % (image.replace('/', '_'), tag)
 
 	else:
 
@@ -121,3 +126,62 @@ def probe_wsl(silent = False):
 		exit(-1)
 
 	return basedir
+
+
+# stream copier with progress bar
+
+def chunked_copy(name, source, dest):
+	"""
+	Copes one stream into another, with progress bar.
+
+	:param name: Name of the file to display.
+	:param source: Source stream.
+	:param dest: Destination stream.
+
+	:return: Number of bytes copied.
+	"""
+
+	size = int(source.info()['Content-Length'].strip())
+	recv = 0
+
+	if len(name) > 23:
+		name = name[0:20] + '...'
+
+	if not sys.platform == 'win32':
+		sys.stdout.write('\033[?25l')
+
+	else:
+		ci = ConsoleCursorInfo()
+		handle = ctypes.windll.kernel32.GetStdHandle(-11)
+		ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(ci))
+		ci.visible = False
+		ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
+
+	while True:
+		chunk = source.read(8192)
+		recv += len(chunk)
+
+		if not chunk:
+			break
+
+		dest.write(chunk)
+
+		pct = round(recv / size * 100, 2)
+		bar = int(50 * recv / size)
+		sys.stdout.write('\r    %s [%s>%s] %0.2f%%' % (name, '=' * bar, ' ' * (50 - bar), pct))
+		sys.stdout.flush()
+
+		if recv >= size:
+			sys.stdout.write('\r%s\r' % (' ' * (66 + len(name))))
+
+	if not sys.platform == 'win32':
+		sys.stdout.write('\033[?25h')
+
+	else:
+		ci = ConsoleCursorInfo()
+		handle = ctypes.windll.kernel32.GetStdHandle(-11)
+		ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(ci))
+		ci.visible = True
+		ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
+
+	return recv

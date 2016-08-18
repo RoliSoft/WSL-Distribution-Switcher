@@ -2,7 +2,7 @@
 # coding=utf-8
 import sys
 import urllib.request
-from utils import Fore, parse_image_arg
+from utils import Fore, parse_image_arg, chunked_copy
 
 # handle arguments
 
@@ -15,9 +15,9 @@ image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 dfurl = ''
 tgurl = ''
 
-print('%s[*]%s Fetching official-images info for %s%s%s:%s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET))
-
 # find the Dockerfile for the specified image and tag
+
+print('%s[*]%s Fetching official-images info for %s%s%s:%s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET))
 
 try:
 	with urllib.request.urlopen('https://raw.githubusercontent.com/docker-library/official-images/master/library/' + image) as f:
@@ -113,31 +113,6 @@ except urllib.error.HTTPError as err:
 # process Dockerfile
 
 print('%s[*]%s Fetching Dockerfile from repo %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, dfurl[dfurl.find('.com/') + len('.com/') : dfurl.find('/Dockerfile')], Fore.RESET))
-
-
-def chunked_copy(name, source, dest):
-	size = int(source.info()['Content-Length'].strip())
-	recv = 0
-
-	while True:
-		chunk = source.read(8192)
-		recv += len(chunk)
-
-		if not chunk:
-			break
-
-		dest.write(chunk)
-
-		pct = round(recv / size * 100, 2)
-		bar = int(50 * recv / size)
-		sys.stdout.write("\r%s [%s>%s] %0.2f%%" % (name, '=' * bar, ' ' * (50 - bar), pct))
-		sys.stdout.flush()
-
-		if recv >= size:
-			sys.stdout.write('\r%s\r' % (' ' * (62 + len(name))))
-
-	return recv
-
 
 try:
 	with urllib.request.urlopen(dfurl) as f:
