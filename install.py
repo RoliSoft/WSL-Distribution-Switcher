@@ -1,99 +1,25 @@
 #!/usr/bin/env python3
 # coding=utf-8
 import sys
-import glob
 import time
 import shutil
 import os.path
 import subprocess
+from utils import Fore, parse_image_arg, probe_wsl
+
+# handle arguments
 
 if len(sys.argv) < 2:
 	print('usage: ./install.py image[:tag] | archive')
 	exit(-1)
 
-# try to get colors, but don't make it a nuisance by requiring dependencies
-
-hasfilter = False
-
-if sys.platform == 'win32':
-	try:
-		from colorama import init
-		init()
-		hasfilter = True
-	except ImportError:
-		pass
-
-if not sys.platform == 'win32' or hasfilter:
-	class Fore:
-		RED    = '\x1B[91m'
-		GREEN  = '\x1B[92m'
-		BLUE   = '\x1B[94m'
-		YELLOW = '\x1B[93m'
-		RESET  = '\x1B[39m'
-else:
-	class Fore:
-		RED    = ''
-		GREEN  = ''
-		BLUE   = ''
-		YELLOW = ''
-		RESET  = ''
-
-# handle arguments
-
-fname = ''
-label = ''
-
-if '.tar' not in sys.argv[1]:
-
-	# handle image:tag
-
-	image = sys.argv[1]
-	tag   = 'latest'
-
-	if ':' in image:
-		idx   = image.find(':')
-		tag   = image[idx + 1:]
-		image = image[:idx]
-
-	fname = 'rootfs_%s_%s.tar*' % (image, tag)
-	names = glob.glob(fname)
-
-	if len(names) > 0:
-		fname = names[0]
-	else:
-		print('%s[!]%s No files found matching %s%s%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET))
-		exit(-1)
-
-	label = '%s_%s' % (image, tag)
-
-else:
-
-	# handle file name
-
-	fname = sys.argv[1]
-
-	if not os.path.isfile(fname):
-		print('%s[!]%s %s%s%s is not an existing file.' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET))
-		exit(-1)
-
-	label = fname[:fname.find('.tar')]
-
-	if label.startswith('rootfs_'):
-		label = label[len('rootfs_'):]
+image, tag, fname, label = parse_image_arg(sys.argv[1], True)
 
 # sanity checks
 
 print('%s[*]%s Probing the Linux subsystem...' % (Fore.GREEN, Fore.RESET))
 
-basedir = os.path.join(os.getenv('LocalAppData'), 'lxss')
-
-if not os.path.isdir(basedir):
-	print('%s[!]%s The Linux subsystem is not installed. Please go through the standard installation procedure first.' % (Fore.RED, Fore.RESET))
-	exit(-1)
-
-if os.path.exists(os.path.join(basedir, 'temp')):
-	print('%s[!]%s The Linux subsystem is currently running. Please kill all instances before continuing.' % (Fore.RED, Fore.RESET))
-	exit(-1)
+basedir = probe_wsl()
 
 user     = ''
 homedir  = ''

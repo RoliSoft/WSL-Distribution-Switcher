@@ -1,2 +1,3 @@
 *.tar.*
 .idea
+__pycache__/

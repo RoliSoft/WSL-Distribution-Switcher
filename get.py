@@ -2,49 +2,18 @@
 # coding=utf-8
 import sys
 import urllib.request
+from utils import Fore, parse_image_arg
+
+# handle arguments
 
 if len(sys.argv) < 2:
 	print('usage: ./get.py image[:tag]')
 	exit(-1)
 
-image = sys.argv[1]
-tag   = 'latest'
-
-if ':' in image:
-	idx   = image.find(':')
-	tag   = image[idx + 1:]
-	image = image[:idx]
+image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 
 dfurl = ''
 tgurl = ''
-fname = 'rootfs_%s_%s' % (image, tag)
-
-# try to get colors, but don't make it a nuisance by requiring dependencies
-
-hasfilter = False
-
-if sys.platform == 'win32':
-	try:
-		from colorama import init
-		init()
-		hasfilter = True
-	except ImportError:
-		pass
-
-if not sys.platform == 'win32' or hasfilter:
-	class Fore:
-		RED    = '\x1B[91m'
-		GREEN  = '\x1B[92m'
-		BLUE   = '\x1B[94m'
-		YELLOW = '\x1B[93m'
-		RESET  = '\x1B[39m'
-else:
-	class Fore:
-		RED    = ''
-		GREEN  = ''
-		BLUE   = ''
-		YELLOW = ''
-		RESET  = ''
 
 print('%s[*]%s Fetching official-images info for %s%s%s:%s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET))
 

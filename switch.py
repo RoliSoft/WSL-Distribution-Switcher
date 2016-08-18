@@ -3,63 +3,21 @@
 import sys
 import os.path
 import subprocess
+from utils import Fore, parse_image_arg, probe_wsl
 
-# try to get colors, but don't make it a nuisance by requiring dependencies
-
-hasfilter = False
-
-if sys.platform == 'win32':
-	try:
-		from colorama import init
-		init()
-		hasfilter = True
-	except ImportError:
-		pass
-
-if not sys.platform == 'win32' or hasfilter:
-	class Fore:
-		RED    = '\x1B[91m'
-		GREEN  = '\x1B[92m'
-		BLUE   = '\x1B[94m'
-		YELLOW = '\x1B[93m'
-		RESET  = '\x1B[39m'
-else:
-	class Fore:
-		RED    = ''
-		GREEN  = ''
-		BLUE   = ''
-		YELLOW = ''
-		RESET  = ''
+# handle arguments
 
 if len(sys.argv) < 2:
 	print('usage: ./switch.py image[:tag]\n\nTo switch back to the default distribution, specify %subuntu%s:%strusty%s as the argument.' % (Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
 	exit(-1)
 
-# handle arguments
-
-image = sys.argv[1]
-tag   = 'latest'
-
-if ':' in image:
-	idx   = image.find(':')
-	tag   = image[idx + 1:]
-	image = image[:idx]
-
-label = '%s_%s' % (image, tag)
+image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 
 # sanity checks
 
 print('%s[*]%s Probing the Linux subsystem...' % (Fore.GREEN, Fore.RESET))
 
-basedir = os.path.join(os.getenv('LocalAppData'), 'lxss')
-
-if not os.path.isdir(basedir):
-	print('%s[!]%s The Linux subsystem is not installed. Please go through the standard installation procedure first.' % (Fore.RED, Fore.RESET))
-	exit(-1)
-
-if os.path.exists(os.path.join(basedir, 'temp')):
-	print('%s[!]%s The Linux subsystem is currently running. Please kill all instances before continuing.' % (Fore.RED, Fore.RESET))
-	exit(-1)
+basedir = probe_wsl()
 
 # read label of current distribution
 
