@@ -57,16 +57,17 @@ except subprocess.CalledProcessError as err:
 
 # get /etc/{passwd,shadow} entries
 
-print('%s[*]%s Reading %s/etc/{passwd,shadow}%s entries for user %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
+print('%s[*]%s Reading %s/etc/{passwd,shadow}%s entries for users %sroot%s and %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
 
-etcpasswd = ''
-etcshadow = ''
+etcpasswduser = ''
+etcshadowroot = ''
+etcshadowuser = ''
 
 try:
 	with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd')) as f:
 		for line in f.readlines():
 			if line.startswith(user + ':'):
-				etcpasswd = line.strip()
+				etcpasswduser = line.strip()
 
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/etc/passwd%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -75,12 +76,24 @@ except OSError as err:
 try:
 	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow')) as f:
 		for line in f.readlines():
+			if line.startswith('root:'):
+				etcshadowroot = line.strip()
 			if line.startswith(user + ':'):
-				etcshadow = line.strip()
+				etcshadowuser = line.strip()
 
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/etc/shadow%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
+
+if etcshadowroot:
+	parts = etcshadowroot.split(':')
+
+	if parts[1] == '*' or parts[1].startswith('!'):
+		etcshadowroot = ''
+		print('%s[!]%s Your %sroot%s account has no password set, which means you cannot use %ssu%s. Since most distributions do not come with %ssudo%s preinstalled, you might end up powerless.' % (Fore.RED, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
+
+	else:
+		etcshadowroot = parts[1]
 
 # remove old remnants
 
@@ -176,15 +189,30 @@ print('%s[*]%s Writing entries of user %s%s%s to %s/etc/{passwd,shadow}%s...' % 
 
 try:
 	with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), 'a') as f:
-		f.write(etcpasswd + '\n')
+		f.write(etcpasswduser + '\n')
 
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/etc/passwd%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
 
 try:
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), 'a') as f:
-		f.write(etcshadow + '\n')
+	shadows = []
+
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), 'r+') as f:
+		shadows = f.readlines()
+
+		if etcshadowroot:
+			for i in range(len(shadows)):
+				if shadows[i].startswith('root:'):
+					parts = shadows[i].split(':')
+					parts[1] = etcshadowroot
+					shadows[i] = ':'.join(parts)
+
+		f.seek(0)
+		f.writelines(shadows)
+		f.write(etcshadowuser + '\n')
+
+		print(shadows)
 
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/etc/shadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
