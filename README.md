@@ -66,7 +66,9 @@ $ python get-prebuilt.py kalilinux/kali-linux-docker
 
 The `install.py` script is responsible for installing the tarballs as new rootfs.
 
-The first argument of the script is either the _a)_ name of the file or the _b)_ same image:tag notation used in the `get.py` script: `install.py image[:tag] | archive`. You can install tarballs from sources other than the Docker Hub, however, they're not guaranteed to work.
+The first argument of the script is either the _a)_ name of the file or the _b)_ same image:tag notation used in the `get.py` script: `install.py image[:tag] | tarball | squashfs`. You can install tarballs from sources other than the Docker Hub, however, they're not guaranteed to work.
+
+The specified file can be a `.tar*` archive, or a SquashFS image with `.sfs` or `.squashfs` extension. In order to process SquashFS images, the `unsquashfs` application needs to be installed inside WSL. You can do this with `apt-get install squashfs-tools` on the default distribution.
 
 To install the freshly downloaded `rootfs_debian_sid.tar.xz` archive, run `install.py debian:sid` or `install.py rootfs_debian_sid.tar.xz`.
 
@@ -158,9 +160,9 @@ As mentioned before, switching is just 2 directory rename operations. However, W
 
 * ~~Figure out pulling and merging the layers from Docker Hub directly, in order to support all published prebuilt images. The procedure is thoroughly documented on the [Docker Registry HTTP API V2](https://docs.docker.com/registry/spec/api/) page, however, merging the downloaded layers might present an issue.~~ Done, see `get-prebuilt.py`.
 
-* Figure out if it's possible to attach the Linux-specific metadata from outside of WSL, so then tarballs can be extracted and processed without invoking WSL.
+* ~~Check whether extracting the SquashFS files from within ISO images to a rootfs works as well as Docker's rootfs tarballs. If so, implement new installer to automate it.~~ Done, installer now supports SquashFS images as the first argument.
 
-* Check whether extracting the squashfs files from within ISO images to a rootfs works as well as Docker's rootfs tarballs. If so, implement new installer to automate it.
+* Figure out if it's possible to attach the Linux-specific metadata from outside of WSL, so then tarballs can be extracted and processed without invoking WSL.
 
 * Implement hooks, so patches can be applied to fix WSL issues on a per-image basis, or just user-specific ones, such as preinstalling a few packages.
 

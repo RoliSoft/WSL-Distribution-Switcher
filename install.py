@@ -10,7 +10,7 @@ from utils import Fore, parse_image_arg, probe_wsl
 # handle arguments
 
 if len(sys.argv) < 2:
-	print('usage: ./install.py image[:tag] | archive')
+	print('usage: ./install.py image[:tag] | tarball | squashfs')
 	exit(-1)
 
 image, tag, fname, label = parse_image_arg(sys.argv[1], True)
@@ -54,6 +54,23 @@ try:
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
+
+# check squashfs prerequisites
+
+fext = os.path.splitext(fname)[-1].lower()
+
+if fext == '.sfs' or fext == '.squashfs':
+	paths = ['usr/local/sbin', 'usr/local/bin', 'usr/sbin', 'usr/bin', 'sbin', 'bin']
+	found = False
+
+	for path in paths:
+		if os.path.isfile(os.path.join(basedir, 'rootfs', path, 'unsquashfs')):
+			found = True
+			break
+
+	if not found:
+		print('%s[!]%s Failed to find %sunsquashfs%s in the current WSL distribution. Install it with %sapt-get install squashfs-tools%s for SquashFS support.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
+		exit(-1)
 
 # get /etc/{passwd,shadow,group,gshadow} entries
 
@@ -141,8 +158,13 @@ except subprocess.CalledProcessError as err:
 
 print('%s[*]%s Beginning extraction...' % (Fore.GREEN, Fore.RESET))
 
+xtrcmd = 'sudo tar xfp %s --ignore-zeros --exclude=\'dev/*\'' % fname
+
+if fext == '.sfs' or fext == '.squashfs':
+	xtrcmd = 'sudo unsquashfs -f -x -d . ' + fname
+
 try:
-	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && sudo tar xfp %s --ignore-zeros --exclude=\'dev/*\'' % fname])
+	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && ' + xtrcmd])
 	pass
 
 except subprocess.CalledProcessError as err:

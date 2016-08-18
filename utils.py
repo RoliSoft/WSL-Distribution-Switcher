@@ -51,12 +51,14 @@ def parse_image_arg(argv, can_be_file = False):
 	:return: Name of the image, tag, name of the file, label.
 	"""
 
+	exts  = ['.tar', '.sfs', '.squashfs']
+	argvl = argv.lower()
 	image = argv
 	tag   = 'latest'
 	fname = ''
 	label = ''
 
-	if not can_be_file or '.tar' not in argv:
+	if not can_be_file or all(ext not in argvl for ext in exts):
 
 		# handle image:tag
 
@@ -90,10 +92,21 @@ def parse_image_arg(argv, can_be_file = False):
 			print('%s[!]%s %s%s%s is not an existing file.' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET))
 			exit(-1)
 
-		label = fname[:fname.find('.tar')]
+		idx = -1
+
+		for ext in exts:
+			idx = argvl.find(ext)
+
+			if idx != -1:
+				break
+
+		label = argvl[:idx]
 
 		if label.startswith('rootfs_'):
 			label = label[len('rootfs_'):]
+
+		if label.find('_') == -1:
+			label += '_' + tag
 
 	return image, tag, fname, label
 
