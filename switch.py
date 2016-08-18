@@ -21,6 +21,7 @@ if len(sys.argv) < 2:
 	if basedir:
 
 		names = glob.glob(os.path.join(basedir, 'rootfs_*'))
+		not_trusty = True
 		has_trusty = False
 
 		if len(names) > 0:
@@ -42,9 +43,10 @@ if len(sys.argv) < 2:
 
 			if active == 'ubuntu_trusty':
 				has_trusty = True
+				not_trusty = False
 
 			active = active.split('_', 1)
-			print('  - %s%s%s:%s%s%s%s*%s' % (Fore.YELLOW, active[0], Fore.RESET, Fore.YELLOW, active[1], Fore.RESET, Fore.BLUE, Fore.RESET))
+			print('  - %s%s%s:%s%s%s%s*%s' % (Fore.YELLOW, active[0], Fore.RESET, Fore.YELLOW, active[1], Fore.RESET, Fore.GREEN, Fore.RESET))
 
 			for name in names:
 				name = os.path.basename(name).replace('rootfs_', '').split('_', 1)
@@ -57,12 +59,13 @@ if len(sys.argv) < 2:
 
 				print('  - %s%s%s:%s%s%s' % (Fore.YELLOW, name[0], Fore.RESET, Fore.YELLOW, name[1], Fore.RESET))
 
-		print()
+		if not_trusty:
+			print()
 
-		if has_trusty:
-			print('To switch back to the default distribution, specify %subuntu%s:%strusty%s as the argument.' % (Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
-		else:
-			print('You do not seem to have the default distribution installed anymore.\nTo reinstall it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
+			if has_trusty:
+				print('To switch back to the default distribution, specify %subuntu%s:%strusty%s as the argument.' % (Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
+			else:
+				print('You do not seem to have the default distribution installed anymore.\nTo reinstall it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
 
 	exit(-1)
 
