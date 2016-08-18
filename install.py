@@ -55,13 +55,15 @@ except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
 
-# get /etc/{passwd,shadow} entries
+# get /etc/{passwd,shadow,group,gshadow} entries
 
-print('%s[*]%s Reading %s/etc/{passwd,shadow}%s entries for users %sroot%s and %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
+print('%s[*]%s Reading %s/etc/{passwd,shadow,group,gshadow}%s entries for users %sroot%s and %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
 
-etcpasswduser = ''
-etcshadowroot = ''
-etcshadowuser = ''
+etcpasswduser  = ''
+etcshadowroot  = ''
+etcshadowuser  = ''
+etcgroupuser   = ''
+etcgshadowuser = ''
 
 try:
 	with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd')) as f:
@@ -83,6 +85,26 @@ try:
 
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/etc/shadow%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+	exit(-1)
+
+try:
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'group')) as f:
+		for line in f.readlines():
+			if line.startswith(user + ':'):
+				etcgroupuser = line.strip()
+
+except OSError as err:
+	print('%s[!]%s Failed to open file %s/etc/group%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+	exit(-1)
+
+try:
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow')) as f:
+		for line in f.readlines():
+			if line.startswith(user + ':'):
+				etcgshadowuser = line.strip()
+
+except OSError as err:
+	print('%s[!]%s Failed to open file %s/etc/gshadow%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
 
 if etcshadowroot:
@@ -120,7 +142,7 @@ except subprocess.CalledProcessError as err:
 print('%s[*]%s Beginning extraction...' % (Fore.GREEN, Fore.RESET))
 
 try:
-	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && tar xfp %s --ignore-zeros --exclude=\'dev/*\'' % fname])
+	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && sudo tar xfp %s --ignore-zeros --exclude=\'dev/*\'' % fname])
 	pass
 
 except subprocess.CalledProcessError as err:
@@ -183,9 +205,9 @@ except subprocess.CalledProcessError as err:
 
 	exit(-1)
 
-# append user entries to /etc/{passwd,shadow}
+# append user entries to /etc/{passwd,shadow,group,gshadow}
 
-print('%s[*]%s Writing entries of user %s%s%s to %s/etc/{passwd,shadow}%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET, Fore.BLUE, Fore.RESET))
+print('%s[*]%s Writing entries of users %sroot%s and %s%s%s to %s/etc/{passwd,shadow,group,gshadow}%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, user, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 try:
 	with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), 'a') as f:
@@ -212,10 +234,24 @@ try:
 		f.writelines(shadows)
 		f.write(etcshadowuser + '\n')
 
-		print(shadows)
-
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/etc/shadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+	exit(-1)
+
+try:
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'group'), 'a') as f:
+		f.write(etcgroupuser + '\n')
+
+except OSError as err:
+	print('%s[!]%s Failed to open file %s/etc/group%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+	exit(-1)
+
+try:
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow'), 'a') as f:
+		f.write(etcgshadowuser + '\n')
+
+except OSError as err:
+	print('%s[!]%s Failed to open file %s/etc/gshadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
 
 try:
