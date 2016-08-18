@@ -78,7 +78,10 @@ try:
 				line   = line[0].split('@', 1)
 				repo   = line[0]
 				commit = line[1]
-				repo   = repo[repo.find('github.com/') + len('github.com/') : repo.find('.git')]
+				repo   = repo[repo.find('github.com/') + len('github.com/'):]
+
+				if repo.find('.git') != -1:
+					repo = repo[:repo.find('.git')]
 
 				if len(path) != 0:
 					path = '/' + path
