@@ -8,13 +8,10 @@ from utils import Fore, parse_image_arg, chunked_copy
 # handle arguments
 
 if len(sys.argv) < 2:
-	print('usage: ./get.py image[:tag]')
+	print('usage: ./get-prebuilt.py image[:tag]')
 	exit(-1)
 
 image, tag, fname, label = parse_image_arg(sys.argv[1], False)
-
-dfurl = ''
-tgurl = ''
 
 token = ''
 
@@ -60,7 +57,8 @@ except urllib.error.HTTPError as err:
 
 # download the layers
 
-dled = set()
+dled   = set()
+fname += '.tar.gz'
 
 for layer in manifest['fsLayers']:
 	if layer['blobSum'] in dled:
@@ -70,21 +68,19 @@ for layer in manifest['fsLayers']:
 
 	print('%s[*]%s Downloading layer %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, layer['blobSum'], Fore.RESET))
 
-	lname = '%s.diff_%03d.tar.gz' % (fname, len(dled))
-
 	try:
 		r = urllib.request.Request('https://registry.hub.docker.com/v2/%s/blobs/%s' % (image, layer['blobSum']))
 		r.add_header('Authorization', 'Bearer ' + token)
 
-		with urllib.request.urlopen(r) as u, open(lname, 'wb') as f:
-			chunked_copy(lname, u, f)
+		with urllib.request.urlopen(r) as u, open(fname, 'ab') as f:
+			chunked_copy(fname, u, f)
 
 	except urllib.error.HTTPError as err:
 		print('%s[!]%s Failed to download layer %s%s%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, layer['blobSum'], Fore.RESET, err))
 		exit(-1)
 
 	except OSError as err:
-		print('%s[!]%s Failed to open file %s%s%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, lname, Fore.RESET, err))
+		print('%s[!]%s Failed to open file %s%s%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET, err))
 		exit(-1)
 
-print('%s[*]%s Rootfs archive for %s%s%s:%s%s%s saved to %s%s.diff_*.tar.gz%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET, Fore.GREEN, fname, Fore.RESET))
+print('%s[*]%s Rootfs archive for %s%s%s:%s%s%s saved to %s%s.tar.gz%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET, Fore.GREEN, fname, Fore.RESET))

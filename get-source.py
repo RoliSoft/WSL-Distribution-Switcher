@@ -7,7 +7,7 @@ from utils import Fore, parse_image_arg, chunked_copy
 # handle arguments
 
 if len(sys.argv) < 2:
-	print('usage: ./get.py image[:tag]')
+	print('usage: ./get-source.py image[:tag]')
 	exit(-1)
 
 image, tag, fname, label = parse_image_arg(sys.argv[1], False)
@@ -108,6 +108,7 @@ try:
 
 except urllib.error.HTTPError as err:
 	print('%s[!]%s Failed to fetch official-images info for %s%s%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, image, Fore.RESET, err))
+	print('%s[!]%s If this is not an official image, try getting it with %sget-prebuilt.py %s%s.' % (Fore.RED, Fore.RESET, Fore.GREEN, sys.argv[1].strip(), Fore.RESET))
 	exit(-1)
 
 # process Dockerfile
