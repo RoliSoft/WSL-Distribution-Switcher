@@ -95,9 +95,11 @@ def parse_image_arg(argv, can_be_file = False):
 
 # sanity check WSL installation
 
-def probe_wsl():
+def probe_wsl(silent = False):
 	"""
 	Checks whether the WSL is installed and not running.
+
+	:type silent: Whether to print an error message or just return an empty string on failure.
 
 	:return: Path to the WSL directory.
 	"""
@@ -105,10 +107,16 @@ def probe_wsl():
 	basedir = os.path.join(os.getenv('LocalAppData'), 'lxss')
 
 	if not os.path.isdir(basedir):
+		if silent:
+			return None
+
 		print('%s[!]%s The Linux subsystem is not installed. Please go through the standard installation procedure first.' % (Fore.RED, Fore.RESET))
 		exit(-1)
 
 	if os.path.exists(os.path.join(basedir, 'temp')):
+		if silent:
+			return None
+
 		print('%s[!]%s The Linux subsystem is currently running. Please kill all instances before continuing.' % (Fore.RED, Fore.RESET))
 		exit(-1)
 

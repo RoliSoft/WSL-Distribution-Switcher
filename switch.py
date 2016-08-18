@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # coding=utf-8
+import glob
 import sys
 import os.path
 import subprocess
@@ -8,7 +9,61 @@ from utils import Fore, parse_image_arg, probe_wsl
 # handle arguments
 
 if len(sys.argv) < 2:
-	print('usage: ./switch.py image[:tag]\n\nTo switch back to the default distribution, specify %subuntu%s:%strusty%s as the argument.' % (Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
+
+	# print usage information
+
+	print('usage: ./switch.py image[:tag]')
+
+	# check if there are any installations
+
+	basedir = probe_wsl(True)
+
+	if basedir:
+
+		names = glob.glob(os.path.join(basedir, 'rootfs_*'))
+		has_trusty = False
+
+		if len(names) > 0:
+
+			print('\nThe following distributions are currently installed:\n')
+
+			active = ''
+
+			if os.path.isfile(os.path.join(basedir, 'rootfs', '.switch_label')):
+				try:
+					with open(os.path.join(basedir, 'rootfs', '.switch_label')) as f:
+						active = f.readline().strip()
+
+				except OSError as err:
+					active = 'ubuntu_trusty'
+
+			else:
+				active = 'ubuntu_trusty'
+
+			if active == 'ubuntu_trusty':
+				has_trusty = True
+
+			active = active.split('_', 1)
+			print('  - %s%s%s:%s%s%s%s*%s' % (Fore.YELLOW, active[0], Fore.RESET, Fore.YELLOW, active[1], Fore.RESET, Fore.BLUE, Fore.RESET))
+
+			for name in names:
+				name = os.path.basename(name).replace('rootfs_', '').split('_', 1)
+
+				if len(name) != 2:
+					continue
+
+				if name[0] == 'ubuntu' and name[1] == 'trusty':
+					has_trusty = True
+
+				print('  - %s%s%s:%s%s%s' % (Fore.YELLOW, name[0], Fore.RESET, Fore.YELLOW, name[1], Fore.RESET))
+
+		print()
+
+		if has_trusty:
+			print('To switch back to the default distribution, specify %subuntu%s:%strusty%s as the argument.' % (Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
+		else:
+			print('You do not seem to have the default distribution installed anymore.\nTo reinstall it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
+
 	exit(-1)
 
 image, tag, fname, label = parse_image_arg(sys.argv[1], False)
