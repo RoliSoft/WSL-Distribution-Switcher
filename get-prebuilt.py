@@ -83,4 +83,4 @@ for layer in manifest['fsLayers']:
 		print('%s[!]%s Failed to open file %s%s%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET, err))
 		exit(-1)
 
-print('%s[*]%s Rootfs archive for %s%s%s:%s%s%s saved to %s%s.tar.gz%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET, Fore.GREEN, fname, Fore.RESET))
+print('%s[*]%s Rootfs archive for %s%s%s:%s%s%s saved to %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET, Fore.GREEN, fname, Fore.RESET))

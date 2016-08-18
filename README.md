@@ -2,7 +2,7 @@
 
 The purpose of this project is to let you easily download and install new Linux distributions under Windows Subsystem for Linux and seamlessly switch between them.
 
-The rootfs archives are currently downloaded from Docker Hub's official images' repositories.
+The rootfs archives are currently downloaded from Docker Hub's official images' repositories ("source") or published image layers ("prebuilt").
 
 If you want to read about some of the challenges I faced while implementing the scripts, you can check out [this blog post](https://lab.rolisoft.net/blog/switching-the-distribution-behind-the-windows-subsystem-for-linux.html). This readme only contains usage information and some troubleshooting.
 
@@ -14,12 +14,14 @@ To begin, clone the repository or [download a copy](https://github.com/RoliSoft/
 
 ### Obtaining tarballs
 
-The `get.py` script can download the tarballs for the official images in Docker Hub.
+#### get-source.py
 
-The first argument of the script is the name of the image, optionally followed by a colon and the desired tag: `get.py image[:tag]`. For example, to get the rootfs tarball for Debian Sid, just run `get.py debian:sid`. If you don't specify a tag, `latest` will be used, which is generally the _stable_ edition of the distribution.
+This script can download the tarballs for the official images in Docker Hub.
+
+The first argument of the script is the name of the image, optionally followed by a colon and the desired tag: `get-source.py image[:tag]`. For example, to get the rootfs tarball for Debian Sid, just run `get-source.py debian:sid`. If you don't specify a tag, `latest` will be used, which is generally the _stable_ edition of the distribution.
 
 ```
-$ python get.py debian:sid
+$ python get-source.py debian:sid
 [*] Fetching official-images info for debian:sid...
 [*] Fetching Dockerfile from repo tianon/docker-brew-debian/.../sid...
 [*] Downloading archive https://raw.githubusercontent.com/.../sid/rootfs.tar.xz...
@@ -38,6 +40,27 @@ For presentation purposes, the following images and tags are available as of Aug
 * [alpine](https://hub.docker.com/_/alpine/) &ndash; 3.1 __|__ 3.2 __|__ 3.3 __|__ 3.4, latest __|__ edge
 * [crux](https://hub.docker.com/_/crux/) &ndash; latest, 3.1
 * [clearlinux](https://hub.docker.com/_/clearlinux/) &ndash; latest, base
+
+#### get-prebuilt.py
+
+This script can download the layers of the prebuilt images published on Docker Hub. This is what Docker downloads when you run `docker pull`.
+
+The first argument of the script is the name of the image, optionally followed by a colon and the desired tag: `get-prebuilt.py image[:tag]`. For example, to get the rootfs tarball for Debian Sid, just run `get-prebuilt.py debian:sid`. If you don't specify a tag, `latest` will be used, which is generally the _stable_ edition of the distribution.
+
+```
+$ python get-prebuilt.py kalilinux/kali-linux-docker
+[*] Requesting authorization token...
+[*] Fetching manifest info for kalilinux/kali-linux-docker:latest...
+[*] Downloading layer sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4...
+[*] Downloading layer sha256:6e61dde25369335dcf17965aa372c086db53c8021e885df0e09f9c4536d3231e...
+[*] Downloading layer sha256:45f74187929d366242688b3d32ccb5e86c205214071b99e94c0214e7ff2bc836...
+[*] Downloading layer sha256:e5b4b71338633a415ad948734490e368e69605ba508a5fa8ad64775433798fb2...
+[*] Downloading layer sha256:3f96326089c0580ebbcbb68d2f49dce1d7b6fe5cd79d211e4c887b0c9cdbeb02...
+[*] Downloading layer sha256:d4ecedcfaa73285da5657fd51173fa9955468bf693332c03dce58ded73615c62...
+[*] Downloading layer sha256:340395ad18dbbbd79d902342eef997fbd3ecb6679ad5005e5e714e8b0bc11e77...
+[*] Downloading layer sha256:b2860afd831e842446489d37f8933c71dbd4f5d5f4b13d35185c4341fcca9a84...
+[*] Rootfs archive for kalilinux/kali-linux-docker:latest saved to rootfs_kali....tar.gz.
+```
 
 ### Installing new rootfs
 
@@ -67,7 +90,7 @@ This operation extracts the tarball into your home directory from within WSL, th
 Running `bash` should now launch the new distribution:
 
 ```
-C:\Users\RoliSoft\Desktop\wsl-distrib> bash
+$ bash
 RoliSoft@ROLISOFT-PC ≈/wsl-distrib $ cat /etc/debian_version
 stretch/sid
 ```
@@ -87,7 +110,7 @@ The default installation is Ubuntu Trusty. Any rootfs directory with no switch l
 When the script is run without any arguments, the list of installed distributions will be returned:
 
 ```
-C:\Users\RoliSoft\Desktop\wsl-distrib> python switch.py
+$ python switch.py
 usage: ./switch.py image[:tag]
 
 The following distributions are currently installed:
@@ -102,27 +125,27 @@ To switch back to the default distribution, specify ubuntu:trusty as the argumen
 To switch between the distributions, just run the script with the image:tag you want to switch to:
 
 ```
-C:\Users\RoliSoft\Desktop\wsl-distrib> python switch.py fedora:rawhide
+$ python switch.py fedora:rawhide
 [*] Probing the Linux subsystem...
 [*] Backing up current rootfs...
         1 dir(s) moved.
 [*] Switching to new rootfs...
         1 dir(s) moved.
 
-C:\Users\RoliSoft\Desktop\wsl-distrib> bash -c 'dnf --version'
+$ bash -c 'dnf --version'
 1.1.9
   Installed: dnf-0:1.1.9-6.fc26.noarch at 2016-08-12 08:30
   Built    : Fedora Project at 2016-08-09 16:53
 	...
 
-C:\Users\RoliSoft\Desktop\wsl-distrib> python switch.py debian:sid
+$ python switch.py debian:sid
 [*] Probing the Linux subsystem...
 [*] Backing up current rootfs...
         1 dir(s) moved.
 [*] Switching to new rootfs...
         1 dir(s) moved.
 
-C:\Users\RoliSoft\Desktop\wsl-distrib> bash -c 'apt-get -v'
+$ bash -c 'apt-get -v'
 apt 1.3~pre2 (amd64)
 Supported modules:
 *Ver: Standard .deb
@@ -133,7 +156,7 @@ As mentioned before, switching is just 2 directory rename operations. However, W
 
 ## To-do list
 
-* Figure out pulling and merging the layers from Docker Hub directly, in order to support all published prebuilt images. The procedure is thoroughly documented on the [Docker Registry HTTP API V2](https://docs.docker.com/registry/spec/api/) page, however, merging the downloaded layers might present an issue.
+* ~~Figure out pulling and merging the layers from Docker Hub directly, in order to support all published prebuilt images. The procedure is thoroughly documented on the [Docker Registry HTTP API V2](https://docs.docker.com/registry/spec/api/) page, however, merging the downloaded layers might present an issue.~~ Done, see `get-prebuilt.py`.
 
 * Figure out if it's possible to attach the Linux-specific metadata from outside of WSL, so then tarballs can be extracted and processed without invoking WSL.
 
@@ -143,17 +166,11 @@ As mentioned before, switching is just 2 directory rename operations. However, W
 
 ## Troubleshooting
 
-* __get.py returns "Failed to fetch official-images info for $argument."__
-
-Only official images are supported at this time. These have "_" as their vendor in the URL on the Docker Hub.
-
-You can also check out the list of available images here: https://github.com/docker-library/official-images/tree/master/library
-
-* __get.py returns "Failed to find a suitable rootfs specification in Dockerfile."__
+* __get-source.py returns "Failed to find a suitable rootfs specification in Dockerfile."__
 
 The `Dockerfile` has no `ADD archive.tar /` directive. All suitable Linux distributions are packaged similarly and added into root with this directive. Its absence may mean you are trying to download an application based on an OS instead, or the `Dockerfile` for the operating system is a bit more complex than just "add these files".
 
-`FROM` directives are not currently processed.
+`FROM` directives are not currently processed. Try downloading the image with `get-prebuilt.py`.
 
 * __install.py returns an error after "Beginning extraction..."__
 
