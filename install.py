@@ -107,7 +107,7 @@ except subprocess.CalledProcessError as err:
 print('%s[*]%s Beginning extraction...' % (Fore.GREEN, Fore.RESET))
 
 try:
-	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && tar xfp %s' % fname])
+	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && tar xfp %s --ignore-zeros --exclude=\'dev/*\'' % fname])
 	pass
 
 except subprocess.CalledProcessError as err:
