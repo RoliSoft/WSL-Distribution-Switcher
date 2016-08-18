@@ -84,7 +84,22 @@ The `/home`, `/root` and similar directories are stored separately, and as such 
 
 The default installation is Ubuntu Trusty. Any rootfs directory with no switch label inside will automatically be labelled `ubuntu:trusty`, so this is the argument you'll have to specify if you want to go back to the original installation.
 
-To switch between distributions, just run the script with the image:tag you want to switch to:
+When the script is run without any arguments, the list of installed distributions will be returned:
+
+```
+C:\Users\RoliSoft\Desktop\wsl-distrib> python switch.py
+usage: ./switch.py image[:tag]
+
+The following distributions are currently installed:
+
+  - debian:sid*
+  - fedora:rawhide
+  - ubuntu:trusty
+
+To switch back to the default distribution, specify ubuntu:trusty as the argument.
+```
+
+To switch between the distributions, just run the script with the image:tag you want to switch to:
 
 ```
 C:\Users\RoliSoft\Desktop\wsl-distrib> python switch.py fedora:rawhide
@@ -156,4 +171,4 @@ Also, I've noticed, if you create a directory or file outside of WSL, you will _
 
 ![installation](https://lab.rolisoft.net/images/wslswitcher/install.png)
 
-![switching](https://lab.rolisoft.net/images/wslswitcher/switch.png)
+![switching](https://lab.rolisoft.net/images/wslswitcher/switch.png?2)
