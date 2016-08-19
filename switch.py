@@ -4,7 +4,7 @@ import glob
 import sys
 import os.path
 import subprocess
-from utils import Fore, parse_image_arg, probe_wsl
+from utils import Fore, parse_image_arg, probe_wsl, get_label
 
 # handle arguments
 
@@ -20,7 +20,7 @@ if len(sys.argv) < 2:
 
 	if basedir:
 
-		names = glob.glob(os.path.join(basedir, 'rootfs_*'))
+		names = glob.glob(os.path.join(basedir, 'rootfs*'))
 		not_trusty = True
 		has_trusty = False
 
@@ -28,28 +28,9 @@ if len(sys.argv) < 2:
 
 			print('\nThe following distributions are currently installed:\n')
 
-			active = ''
-
-			if os.path.isfile(os.path.join(basedir, 'rootfs', '.switch_label')):
-				try:
-					with open(os.path.join(basedir, 'rootfs', '.switch_label')) as f:
-						active = f.readline().strip()
-
-				except OSError as err:
-					active = 'ubuntu_trusty'
-
-			else:
-				active = 'ubuntu_trusty'
-
-			if active == 'ubuntu_trusty':
-				has_trusty = True
-				not_trusty = False
-
-			active = active.split('_', 1)
-			print('  - %s%s%s:%s%s%s%s*%s' % (Fore.YELLOW, active[0], Fore.RESET, Fore.YELLOW, active[1], Fore.RESET, Fore.GREEN, Fore.RESET))
-
 			for name in names:
-				name = os.path.basename(name).replace('rootfs_', '').split('_', 1)
+				active = os.path.basename(name) == 'rootfs'
+				name   = get_label(name).split('_', 1)
 
 				if len(name) != 2:
 					continue
@@ -57,7 +38,10 @@ if len(sys.argv) < 2:
 				if name[0] == 'ubuntu' and name[1] == 'trusty':
 					has_trusty = True
 
-				print('  - %s%s%s:%s%s%s' % (Fore.YELLOW, name[0], Fore.RESET, Fore.YELLOW, name[1], Fore.RESET))
+					if active:
+						not_trusty = False
+
+				print('  - %s%s%s:%s%s%s%s' % (Fore.YELLOW, name[0], Fore.RESET, Fore.YELLOW, name[1], Fore.RESET, ('%s*%s' % (Fore.GREEN, Fore.RESET) if active else '')))
 
 		if not_trusty:
 			print()
@@ -79,13 +63,9 @@ basedir = probe_wsl()
 
 # read label of current distribution
 
-clabel = ''
+clabel = get_label(os.path.join(basedir, 'rootfs'))
 
-try:
-	with open(os.path.join(basedir, 'rootfs', '.switch_label')) as f:
-		clabel = f.readline().strip()
-
-except OSError as err:
+if not clabel:
 	clabel = 'ubuntu_trusty'
 
 	if label == clabel:
@@ -107,26 +87,26 @@ if not os.path.isdir(os.path.join(basedir, 'rootfs_' + label)):
 
 # do the switch
 
-print('%s[*]%s Backing up current %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
+print('%s[*]%s Moving current %srootfs%s to %srootfs_%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.BLUE, clabel, Fore.RESET))
 
 try:
-	subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs_' + clabel)])
+	subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs_' + clabel)])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
 
-print('%s[*]%s Switching to new %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
+print('%s[*]%s Moving desired %srootfs_%s%s to %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, label, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 try:
-	subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + label), os.path.join(basedir, 'rootfs')])
+	subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + label), os.path.join(basedir, 'rootfs')])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to switch to new %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	print('%s[*]%s Rolling back to old %srootfs%s...' % (Fore.YELLOW, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 	try:
-		subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + clabel), os.path.join(basedir, 'rootfs')])
+		subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + clabel), os.path.join(basedir, 'rootfs')])
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))

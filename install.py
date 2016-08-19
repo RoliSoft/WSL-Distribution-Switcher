@@ -5,7 +5,7 @@ import time
 import shutil
 import os.path
 import subprocess
-from utils import Fore, parse_image_arg, probe_wsl
+from utils import Fore, parse_image_arg, probe_wsl, get_label
 
 # handle arguments
 
@@ -188,13 +188,9 @@ while True:
 
 # read label of current distribution
 
-clabel = ''
+clabel = get_label(os.path.join(basedir, 'rootfs'))
 
-try:
-	with open(os.path.join(basedir, 'rootfs', '.switch_label')) as f:
-		clabel = f.readline().strip()
-
-except OSError as err:
+if not clabel:
 	clabel = 'ubuntu_trusty'
 	print('%s[!]%s No %s/.switch_label%s found, assuming current rootfs is %subuntu%s:%strusty%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
 

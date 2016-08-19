@@ -141,6 +141,114 @@ def probe_wsl(silent = False):
 	return basedir
 
 
+# get label of rootfs
+
+def get_label(path):
+	"""
+	Gets the label for the specified rootfs. If the .switch_label file is not present,
+	but the OS was identified, the file will be created for future use.
+
+	:param path: Path to the rootfs.
+
+	:return: Label of the rootfs.
+	"""
+
+	# see if .switch_label exists
+
+	if os.path.isfile(os.path.join(path, '.switch_label')):
+		try:
+			with open(os.path.join(path, '.switch_label')) as f:
+				label = f.readline().strip()
+
+				if len(label) > 0:
+					return label
+
+		except OSError:
+			pass
+
+	# check if the directory name has any stuff appended to it
+
+	dirname = os.path.basename(path)
+
+	if dirname.startswith('rootfs_'):
+		label = dirname[len('rootfs_'):]
+
+		if len(label) > 0:
+
+			# save label for next occasion
+
+			try:
+				with open(os.path.join(path, '.switch_label'), 'w') as f:
+					f.write(label + '\n')
+			except OSError:
+				pass
+
+			return label
+
+	# see if any *release files exist in /etc/
+
+	rlsfiles = glob.glob(os.path.join(path, 'etc', '*release')) + glob.glob(os.path.join(path, 'usr', 'lib', 'os-release*'))
+
+	if len(rlsfiles) > 0:
+		rlslines = []
+
+		for file in rlsfiles:
+			try:
+				with open(file) as f:
+					rlslines += f.readlines()
+			except OSError:
+				pass
+
+		name = ['', '', '']  # ID || DISTRIB_ID || NAME
+		vers = ['', '', '']  # DISTRIB_CODENAME || DISTRIB_RELEASE || VERSION_ID
+
+		for line in rlslines:
+			kv = line.split('=', 1)
+
+			if len(kv) < 2:
+				continue
+
+			key = kv[0].strip().strip('"\'').lower()
+			val = kv[1].strip().strip('"\'').lower()
+
+			if len(val) == 0:
+				continue
+
+			if key == 'id':
+				name[0] = val
+			elif key == 'distrib_id':
+				name[1] = val
+			elif key == 'name':
+				name[2] = val
+
+			if key == 'distrib_codename':
+				vers[0] = val
+			elif key == 'distrib_release':
+				vers[1] = val
+			elif key == 'version_id':
+				vers[2] = val
+
+		name = list(filter(None, name))
+		vers = list(filter(None, vers))
+
+		if len(name) > 0:
+			label = name[0] + ('_' + vers[0] if len(vers) > 0 else '')
+
+			# save label for next occasion
+
+			try:
+				with open(os.path.join(path, '.switch_label'), 'w') as f:
+					f.write(label + '\n')
+			except OSError:
+				pass
+
+			return label
+
+	# oh well
+
+	return ''
+
+
 # stream copier with progress bar
 
 def chunked_copy(name, source, dest):
