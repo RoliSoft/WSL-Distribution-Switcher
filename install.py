@@ -2,6 +2,7 @@
 # coding=utf-8
 import sys
 import time
+import atexit
 import shutil
 import os.path
 import subprocess
@@ -22,6 +23,7 @@ print('%s[*]%s Probing the Linux subsystem...' % (Fore.GREEN, Fore.RESET))
 basedir = probe_wsl()
 
 user     = ''
+isroot   = False
 homedir  = ''
 homedirw = ''
 
@@ -45,15 +47,71 @@ try:
 			print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
 			exit(-1)
 
-		user = f.readline().strip()
+		user   = f.readline().strip()
+		isroot = user == 'root'
 
-	print('%s[*]%s Home directory is at %s%s%s for user %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.BLUE, homedir, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
+	print('%s[*]%s Default user is %s%s%s at %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET, Fore.BLUE, homedir, Fore.RESET))
 
 	os.unlink(out)
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
+
+# switch to root, if regular user
+
+if not isroot:
+
+	print('%s[*]%s Switching default user to %sroot%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET))
+
+	try:
+		subprocess.check_output(['cmd', '/C', 'C:\\Windows\\sysnative\\lxrun.exe', '/setdefaultuser', 'root'])
+
+	except subprocess.CalledProcessError as err:
+		print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
+		exit(-1)
+
+	try:
+		subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
+		out = os.path.join(basedir, 'rootfs/tmp/.wsl_usr.txt')
+
+		if not os.path.isfile(out):
+			print('%s[!]%s Failed to get home directory of default user in WSL: Output file %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, out, Fore.RESET))
+			exit(-1)
+
+		with open(out) as f:
+			homedir  = f.readline().strip()
+			homedirw = os.path.join(basedir, homedir.lstrip('/'))
+
+			if len(homedir) == 0 or not os.path.isdir(homedirw):
+				print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
+				exit(-1)
+
+			user2 = f.readline().strip()
+
+			if user2 != 'root':
+				print('%s[!]%s Failed to switch default user to %sroot%s.' % (Fore.RED, Fore.RESET, Fore.YELLOW, Fore.RESET))
+				exit(-1)
+
+		os.unlink(out)
+
+	except subprocess.CalledProcessError as err:
+		print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
+		exit(-1)
+
+	# since we switched to root, switch back to regular user on exit
+
+	def switch_user_back(user):
+		print('%s[*]%s Switching default user back to %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
+
+		try:
+			subprocess.check_output(['cmd', '/C', 'C:\\Windows\\sysnative\\lxrun.exe', '/setdefaultuser', user])
+
+		except subprocess.CalledProcessError as err:
+			print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
+			exit(-1)
+
+	atexit.register(switch_user_back, user)
 
 # check squashfs prerequisites
 
@@ -74,7 +132,7 @@ if fext == '.sfs' or fext == '.squashfs':
 
 # get /etc/{passwd,shadow,group,gshadow} entries
 
-print('%s[*]%s Reading %s/etc/{passwd,shadow,group,gshadow}%s entries for users %sroot%s and %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
+print('%s[*]%s Reading %s/etc/{passwd,shadow,group,gshadow}%s entries for %sroot%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, (' and %s%s%s' % (Fore.YELLOW, user, Fore.RESET) if not isroot else '')))
 
 etcpasswduser  = ''
 etcshadowroot  = ''
@@ -82,55 +140,55 @@ etcshadowuser  = ''
 etcgroupuser   = ''
 etcgshadowuser = ''
 
-try:
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd')) as f:
-		for line in f.readlines():
-			if line.startswith(user + ':'):
-				etcpasswduser = line.strip()
+if not isroot:
+	try:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd')) as f:
+			for line in f.readlines():
+				if line.startswith(user + ':'):
+					etcpasswduser = line.strip()
 
-except OSError as err:
-	print('%s[!]%s Failed to open file %s/etc/passwd%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
+	except OSError as err:
+		print('%s[!]%s Failed to open file %s/etc/passwd%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+		exit(-1)
 
 try:
 	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow')) as f:
 		for line in f.readlines():
 			if line.startswith('root:'):
 				etcshadowroot = line.strip()
-			if line.startswith(user + ':'):
+			if not isroot and line.startswith(user + ':'):
 				etcshadowuser = line.strip()
 
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/etc/shadow%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	exit(-1)
 
-try:
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'group')) as f:
-		for line in f.readlines():
-			if line.startswith(user + ':'):
-				etcgroupuser = line.strip()
+if not isroot:
+	try:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'group')) as f:
+			for line in f.readlines():
+				if line.startswith(user + ':'):
+					etcgroupuser = line.strip()
 
-except OSError as err:
-	print('%s[!]%s Failed to open file %s/etc/group%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
+	except OSError as err:
+		print('%s[!]%s Failed to open file %s/etc/group%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+		exit(-1)
 
-try:
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow')) as f:
-		for line in f.readlines():
-			if line.startswith(user + ':'):
-				etcgshadowuser = line.strip()
+	try:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow')) as f:
+			for line in f.readlines():
+				if line.startswith(user + ':'):
+					etcgshadowuser = line.strip()
 
-except OSError as err:
-	print('%s[!]%s Failed to open file %s/etc/gshadow%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
+	except OSError as err:
+		print('%s[!]%s Failed to open file %s/etc/gshadow%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+		exit(-1)
 
 if etcshadowroot:
 	parts = etcshadowroot.split(':')
 
 	if parts[1] == '*' or parts[1].startswith('!'):
 		etcshadowroot = ''
-		print('%s[!]%s Your %sroot%s account has no password set, which means you cannot use %ssu%s. Since most distributions do not come with %ssudo%s preinstalled, you might end up powerless.' % (Fore.RED, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
-
 	else:
 		etcshadowroot = parts[1]
 
@@ -158,10 +216,10 @@ except subprocess.CalledProcessError as err:
 
 print('%s[*]%s Beginning extraction...' % (Fore.GREEN, Fore.RESET))
 
-xtrcmd = 'sudo tar xfp %s --ignore-zeros --exclude=\'dev/*\'' % fname
+xtrcmd = 'tar xfp %s --ignore-zeros --exclude=\'dev/*\'' % fname
 
 if fext == '.sfs' or fext == '.squashfs':
-	xtrcmd = 'sudo unsquashfs -f -x -d . ' + fname
+	xtrcmd = 'unsquashfs -f -x -d . ' + fname
 
 try:
 	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && ' + xtrcmd])
@@ -169,6 +227,7 @@ try:
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to extract archive in WSL: %s' % (Fore.RED, Fore.RESET, err))
+	print('%s[!]%s If the installation failed due to missing applications, you can try switching back to the default distribution by running %sswitch.py ubuntu:trusty%s and if it still fails, try installing all the dependencies with %sapt-get install tar gzip bzip2 xz-utils squashfs-tools%s from within WSL.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
 	exit(-1)
 
 try:
@@ -196,10 +255,10 @@ if not clabel:
 
 # do the switch
 
-print('%s[*]%s Backing up current %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
+print('%s[*]%s Backing up current %srootfs%s to %srootfs_%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.BLUE, clabel, Fore.RESET))
 
 try:
-	subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs_' + clabel)])
+	subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs_' + clabel)])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -208,14 +267,14 @@ except subprocess.CalledProcessError as err:
 print('%s[*]%s Switching to new %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 try:
-	subprocess.check_call(['cmd', '/C', 'move', os.path.join(homedirw, 'rootfs-temp'), os.path.join(basedir, 'rootfs')])
+	subprocess.check_output(['cmd', '/C', 'move', os.path.join(homedirw, 'rootfs-temp'), os.path.join(basedir, 'rootfs')])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to switch to new %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	print('%s[*]%s Rolling back to old %srootfs%s...' % (Fore.YELLOW, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 	try:
-		subprocess.check_call(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + clabel), os.path.join(basedir, 'rootfs')])
+		subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + clabel), os.path.join(basedir, 'rootfs')])
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -223,54 +282,7 @@ except subprocess.CalledProcessError as err:
 
 	exit(-1)
 
-# append user entries to /etc/{passwd,shadow,group,gshadow}
-
-print('%s[*]%s Writing entries of users %sroot%s and %s%s%s to %s/etc/{passwd,shadow,group,gshadow}%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, user, Fore.RESET, Fore.BLUE, Fore.RESET))
-
-try:
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), 'a') as f:
-		f.write(etcpasswduser + '\n')
-
-except OSError as err:
-	print('%s[!]%s Failed to open file %s/etc/passwd%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
-
-try:
-	shadows = []
-
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), 'r+') as f:
-		shadows = f.readlines()
-
-		if etcshadowroot:
-			for i in range(len(shadows)):
-				if shadows[i].startswith('root:'):
-					parts = shadows[i].split(':')
-					parts[1] = etcshadowroot
-					shadows[i] = ':'.join(parts)
-
-		f.seek(0)
-		f.writelines(shadows)
-		f.write(etcshadowuser + '\n')
-
-except OSError as err:
-	print('%s[!]%s Failed to open file %s/etc/shadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
-
-try:
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'group'), 'a') as f:
-		f.write(etcgroupuser + '\n')
-
-except OSError as err:
-	print('%s[!]%s Failed to open file %s/etc/group%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
-
-try:
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow'), 'a') as f:
-		f.write(etcgshadowuser + '\n')
-
-except OSError as err:
-	print('%s[!]%s Failed to open file %s/etc/gshadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
+# save label
 
 try:
 	with open(os.path.join(basedir, 'rootfs', '.switch_label'), 'w') as f:
@@ -278,3 +290,53 @@ try:
 
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/.switch_label%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+
+# append user entries to /etc/{passwd,shadow,group,gshadow}
+
+print('%s[*]%s Writing entries of %sroot%s%s to %s/etc/{passwd,shadow,group,gshadow}%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET, (' and %s%s%s' % (Fore.YELLOW, user, Fore.RESET) if not isroot else ''), Fore.BLUE, Fore.RESET))
+
+if not isroot:
+	try:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), 'a') as f:
+			f.write(etcpasswduser + '\n')
+
+	except OSError as err:
+		print('%s[!]%s Failed to open file %s/etc/passwd%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+
+if not isroot or etcshadowroot:
+	try:
+		shadows = []
+
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), 'r+') as f:
+			shadows = f.readlines()
+
+			if etcshadowroot:
+				for i in range(len(shadows)):
+					if shadows[i].startswith('root:'):
+						parts = shadows[i].split(':')
+						parts[1] = etcshadowroot
+						shadows[i] = ':'.join(parts)
+
+			f.seek(0)
+			f.writelines(shadows)
+
+			if etcshadowuser:
+				f.write(etcshadowuser + '\n')
+
+	except OSError as err:
+		print('%s[!]%s Failed to open file %s/etc/shadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+
+if not isroot:
+	try:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'group'), 'a') as f:
+			f.write(etcgroupuser + '\n')
+
+	except OSError as err:
+		print('%s[!]%s Failed to open file %s/etc/group%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+
+	try:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow'), 'a') as f:
+			f.write(etcgshadowuser + '\n')
+
+	except OSError as err:
+		print('%s[!]%s Failed to open file %s/etc/gshadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
