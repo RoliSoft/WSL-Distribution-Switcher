@@ -75,16 +75,17 @@ To install the freshly downloaded `rootfs_debian_sid.tar.xz` archive, run `insta
 ```
 $ python install.py debian:sid
 [*] Probing the Linux subsystem...
-[*] Home directory is at /home/RoliSoft for user RoliSoft.
-[*] Reading /etc/{passwd,shadow,group,gshadow} entries for users root and RoliSoft...
-[*] Copying rootfs_debian_sid.tar.xz to /home/RoliSoft/rootfs-temp...
+[*] Default user is RoliSoft at /home/RoliSoft.
+[*] Switching default user to root...
+[*] Reading /etc/{passwd,shadow,group,gshadow} entries for root and RoliSoft...
+[*] Removing leftover rootfs-temp...
+[*] Copying rootfs_debian_sid.tar.xz to /root/rootfs-temp...
 [*] Beginning extraction...
 [*] Waiting for the Linux subsystem to exit...
-[*] Backing up current rootfs...
-        1 dir(s) moved.
+[*] Backing current rootfs to rootfs_ubuntu_trusty...
 [*] Switching to new rootfs...
-        1 dir(s) moved.
-[*] Writing entries of users root and RoliSoft to /etc/{passwd,shadow,group,gshadow}...
+[*] Writing entries of root and RoliSoft to /etc/{passwd,shadow,group,gshadow}...
+[*] Switching default user back to RoliSoft...
 ```
 
 This operation extracts the tarball into your home directory from within WSL, then quits WSL and replaces the current rootfs with the new one.
@@ -129,10 +130,8 @@ To switch between the distributions, just run the script with the image:tag you 
 ```
 $ python switch.py fedora:rawhide
 [*] Probing the Linux subsystem...
-[*] Backing up current rootfs...
-        1 dir(s) moved.
-[*] Switching to new rootfs...
-        1 dir(s) moved.
+[*] Moving current rootfs to rootfs_ubuntu_trusty...
+[*] Moving desired rootfs_fedora_rawhide to rootfs...
 
 $ bash -c 'dnf --version'
 1.1.9
@@ -142,10 +141,8 @@ $ bash -c 'dnf --version'
 
 $ python switch.py debian:sid
 [*] Probing the Linux subsystem...
-[*] Backing up current rootfs...
-        1 dir(s) moved.
-[*] Switching to new rootfs...
-        1 dir(s) moved.
+[*] Moving current rootfs to rootfs_fedora_rawhide...
+[*] Moving desired rootfs_debian_sid to rootfs...
 
 $ bash -c 'apt-get -v'
 apt 1.3~pre2 (amd64)
@@ -168,6 +165,20 @@ As mentioned before, switching is just 2 directory rename operations. However, W
 
 ## Troubleshooting
 
+* __no root rights / no `sudo` / `su -l` returns `Authentication failure`__
+
+The script migrates both your regular user and root's password, however, for some reason I found it to be not working perfectly with all distributions in case of root.
+
+In any case, to fix this, you can switch the default user to root on WSL and then reset the root password with with:
+
+```
+> lxrun /setdefaultuser root
+> bash
+$ passwd
+```
+
+Logging in with `su -l` as root should work now. If `passwd` is not available, you can install it with the package manager of the distribution. Same goes with `sudo`, just make sure to edit the `sudoers` with `visudo` to empower your regular account.
+
 * __get-source.py returns "Failed to find a suitable rootfs specification in Dockerfile."__
 
 The `Dockerfile` has no `ADD archive.tar /` directive. All suitable Linux distributions are packaged similarly and added into root with this directive. Its absence may mean you are trying to download an application based on an OS instead, or the `Dockerfile` for the operating system is a bit more complex than just "add these files".
@@ -178,13 +189,13 @@ The `Dockerfile` has no `ADD archive.tar /` directive. All suitable Linux distri
 
 This depends on the error, which should be printed on the console. The Python script has no access to the error message due to `stdout`/`stderr` redirection limits within WSL. (See [issue #2](https://github.com/Microsoft/BashOnWindows/issues/2).)
 
-Generally, you should switch back to the default installation (`./switch.py ubuntu:trusty`) and try again, since the extraction part has to be done from within WSL due to Linux-specific metadata being attached to the files.
+Generally, you should switch back to the default installation (`switch.py ubuntu:trusty`) and try again, since the extraction part has to be done from within WSL due to Linux-specific metadata being attached to the files.
 
-In case of not found errors, make sure you have all dependencies installed from within WSL: `sudo apt-get install tar gzip bzip2 xz-utils`
+In case of not found errors, make sure you have all dependencies installed from within WSL: `sudo apt-get install tar gzip bzip2 xz-utils squashfs-tools`
 
-In case of permission errors, make sure you have write access to your home directory at `/home/$USER` and `/tmp`. Also make sure you have no leftover `rootfs-temp` directory in your home. While the script removes such leftover artifacts, if these files were touched from outside of WSL, it's possible it can't remove it.
+In case of permission errors, make sure you have write access to your root directory at `/root` and `/tmp`. Also make sure you have no leftover `rootfs-temp` directory in your home. While the script removes such leftover artifacts, if these files were touched from outside of WSL, it's possible it can't remove it.
 
-Also, I've noticed, if you create a directory or file outside of WSL, you will __not__ see it from within WSL, and if you try to write to a file with the same name, you'll just get a generic I/O error. In this case, open `%LocalAppData%\lxss` from Windows Explorer, and check if `home/rootfs-temp` exists.
+Also, I've noticed, if you create a directory or file outside of WSL, you will __not__ see it from within WSL, and if you try to write to a file with the same name, you'll just get a generic I/O error. In this case, open `%LocalAppData%\lxss` from Windows Explorer, and check if `root/rootfs-temp` exists.
 
 ## Screenshots
 
