@@ -153,7 +153,7 @@ etcgshadowuser = ''
 
 if not isroot:
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd')) as f:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), newline='\n') as f:
 			for line in f.readlines():
 				if line.startswith(user + ':'):
 					etcpasswduser = line.strip()
@@ -163,7 +163,7 @@ if not isroot:
 		exit(-1)
 
 try:
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow')) as f:
+	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), newline='\n') as f:
 		for line in f.readlines():
 			if line.startswith('root:'):
 				etcshadowroot = line.strip()
@@ -176,7 +176,7 @@ except OSError as err:
 
 if not isroot:
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'group')) as f:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'group'), newline='\n') as f:
 			for line in f.readlines():
 				if line.startswith(user + ':'):
 					etcgroupuser = line.strip()
@@ -186,7 +186,7 @@ if not isroot:
 		exit(-1)
 
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow')) as f:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow'), newline='\n') as f:
 			for line in f.readlines():
 				if line.startswith(user + ':'):
 					etcgshadowuser = line.strip()
@@ -308,7 +308,7 @@ print('%s[*]%s Writing entries of %sroot%s%s to %s/etc/{passwd,shadow,group,gsha
 
 if not isroot:
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), 'a') as f:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), 'a', newline='\n') as f:
 			f.write(etcpasswduser + '\n')
 
 	except OSError as err:
@@ -318,7 +318,7 @@ if not isroot or etcshadowroot:
 	try:
 		shadows = []
 
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), 'r+') as f:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), 'r+', newline='\n') as f:
 			shadows = f.readlines()
 
 			if etcshadowroot:
@@ -339,14 +339,14 @@ if not isroot or etcshadowroot:
 
 if not isroot:
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'group'), 'a') as f:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'group'), 'a', newline='\n') as f:
 			f.write(etcgroupuser + '\n')
 
 	except OSError as err:
 		print('%s[!]%s Failed to open file %s/etc/group%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow'), 'a') as f:
+		with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow'), 'a', newline='\n') as f:
 			f.write(etcgshadowuser + '\n')
 
 	except OSError as err:
