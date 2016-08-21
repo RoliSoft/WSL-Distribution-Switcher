@@ -340,3 +340,43 @@ if not isroot:
 
 	except OSError as err:
 		print('%s[!]%s Failed to open file %s/etc/gshadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+
+# run post-install hooks, if any
+
+hooks = ['all', image, image + '_' + tag]
+
+for hook in hooks:
+	hookfile = 'hook_postinstall_%s.sh' % hook
+
+	if os.path.isfile(hookfile):
+		print('%s[*]%s Running post-install hook %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.GREEN, hook, Fore.RESET))
+
+		hookpath = os.path.join(homedirw, hookfile)
+
+		try:
+			subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'echo -n > /root/%s && chmod +x /root/%s' % (hookfile, hookfile)])
+
+			if not os.path.isfile(hookpath):
+				print('%s[!]%s Failed to copy hook to WSL: File %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, hookpath, Fore.RESET))
+				continue
+
+		except subprocess.CalledProcessError as err:
+			print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
+			continue
+
+		try:
+			with open(hookfile) as s, open(hookpath, 'a', newline='\n') as d:
+				d.write(s.read().replace('\r', ''))
+
+		except OSError as err:
+			print('%s[!]%s Failed to open hook: %s' % (Fore.RED, Fore.RESET, err))
+			continue
+
+		try:
+			subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'REGULARUSER="%s" /root/%s' % (user if not isroot else '', hookfile)])
+
+		except subprocess.CalledProcessError as err:
+			print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
+			continue
+
+		os.unlink(hookpath)
