@@ -10,11 +10,22 @@ from utils import Fore, parse_image_arg, probe_wsl, get_label
 
 # handle arguments
 
-if len(sys.argv) < 2:
-	print('usage: ./install.py image[:tag] | tarball | squashfs')
+imgarg   = ''
+runhooks = True
+
+if len(sys.argv) > 1:
+	for arg in sys.argv[1:]:
+		if arg.lower() == '--no-hooks':
+			runhooks = False
+		elif not imgarg:
+			imgarg = arg
+
+if not imgarg:
+	print('usage: ./install.py [--no-hooks] image[:tag] | tarball | squashfs')
+	print('\noptions:\n  --no-hooks    Omits running the hook scripts.')
 	exit(-1)
 
-image, tag, fname, label = parse_image_arg(sys.argv[1], True)
+image, tag, fname, label = parse_image_arg(imgarg, True)
 
 # sanity checks
 
@@ -343,40 +354,41 @@ if not isroot:
 
 # run post-install hooks, if any
 
-hooks = ['all', image, image + '_' + tag]
+if runhooks:
+	hooks = ['all', image, image + '_' + tag]
 
-for hook in hooks:
-	hookfile = 'hook_postinstall_%s.sh' % hook
+	for hook in hooks:
+		hookfile = 'hook_postinstall_%s.sh' % hook
 
-	if os.path.isfile(hookfile):
-		print('%s[*]%s Running post-install hook %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.GREEN, hook, Fore.RESET))
+		if os.path.isfile(hookfile):
+			print('%s[*]%s Running post-install hook %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.GREEN, hook, Fore.RESET))
 
-		hookpath = os.path.join(homedirw, hookfile)
+			hookpath = os.path.join(homedirw, hookfile)
 
-		try:
-			subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'echo -n > /root/%s && chmod +x /root/%s' % (hookfile, hookfile)])
+			try:
+				subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'echo -n > /root/%s && chmod +x /root/%s' % (hookfile, hookfile)])
 
-			if not os.path.isfile(hookpath):
-				print('%s[!]%s Failed to copy hook to WSL: File %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, hookpath, Fore.RESET))
+				if not os.path.isfile(hookpath):
+					print('%s[!]%s Failed to copy hook to WSL: File %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, hookpath, Fore.RESET))
+					continue
+
+			except subprocess.CalledProcessError as err:
+				print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
 				continue
 
-		except subprocess.CalledProcessError as err:
-			print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
-			continue
+			try:
+				with open(hookfile) as s, open(hookpath, 'a', newline='\n') as d:
+					d.write(s.read().replace('\r', ''))
 
-		try:
-			with open(hookfile) as s, open(hookpath, 'a', newline='\n') as d:
-				d.write(s.read().replace('\r', ''))
+			except OSError as err:
+				print('%s[!]%s Failed to open hook: %s' % (Fore.RED, Fore.RESET, err))
+				continue
 
-		except OSError as err:
-			print('%s[!]%s Failed to open hook: %s' % (Fore.RED, Fore.RESET, err))
-			continue
+			try:
+				subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'REGULARUSER="%s" /root/%s' % (user if not isroot else '', hookfile)])
 
-		try:
-			subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'REGULARUSER="%s" /root/%s' % (user if not isroot else '', hookfile)])
+			except subprocess.CalledProcessError as err:
+				print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
+				continue
 
-		except subprocess.CalledProcessError as err:
-			print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
-			continue
-
-		os.unlink(hookpath)
+			os.unlink(hookpath)
