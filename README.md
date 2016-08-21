@@ -93,10 +93,48 @@ This operation extracts the tarball into your home directory from within WSL, th
 Running `bash` should now launch the new distribution:
 
 ```
-$ bash
-RoliSoft@ROLISOFT-PC ≈/wsl-distrib $ cat /etc/debian_version
+> bash
+$ cat /etc/debian_version
 stretch/sid
 ```
+
+#### Post-install hook scripts
+
+It's possible to write hook scripts which are copied to WSL and run as root by the installer during the initial installation.
+
+Hooks have the file naming convention `hook_<event>_<label>.sh`, where:
+
+* `event` &ndash; Only `postinstall` is supported currently. Open a ticket if you have suggestions for more.
+* `label`
+  * `all` &ndash; Runs on all installations. Make sure to have your script check if the current environment is suitable and exit gracefully if not, otherwise you might end up breaking some of your installations.
+  * _`image`_ &ndash; Runs on _name of the image_, which is the first argument before the tag separator. E.g. `debian` in `debian:sid`.
+  * _`label`_ &ndash; Runs on a specific label. E.g. `debian_sid` for `debian:sid`; see the value in `/.switch_label`, but it's generally the tag-separator replaced from `:` to `_`.
+
+The hook scripts are currently run in the order of least to most specific: `all -> image -> label`.
+
+The installer will set the `REGULARUSER` environmental variable to the name of your regular user.
+
+To prevent the invocation of the hook scripts, specify the `--no-hooks` argument to the installer.
+
+#### Sample global hook script
+
+A sample global hook script is provided in `hook_postinstall_all.sample.sh`. If you would like to run this during all of your installations, remove the `.sample` from the file name.
+
+The provided script supports APT-based (such as Debian and Ubuntu) and RPM-based (such as Fedora and CentOS) distributions. For all other distributions, it will gracefully terminate.
+
+As noted above, the `REGULARUSER` environmental variable will be provided by `install.py`, which is the name of your regular user. This value will be used to add your user to the `sudoers` list.
+
+Additionally, it accepts the `ROOTPASSWD` environmental variable, which should contain the password to set for the root account. If this is not specified, the password will be set to `toor`.
+
+The script does the following:
+
+* Upgrades the system, installs some critical missing packages. (Such as `apt-utils` on Debian.)
+* Fixes locale warnings with apt/dpkg.
+* Resets the root password.
+* Installs `sudo` and adds user to `sudoers`.
+* Fixes sudo hostname resolution warning.
+* Installs basic dependencies required to install new distributions.
+* Installs git, vim, tmux.
 
 ### Switching between distributions
 
