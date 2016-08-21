@@ -1,3 +1,5 @@
+hook_*.sh
+!hook_*.sample.sh
 *.tar.*
 .idea
 __pycache__/
