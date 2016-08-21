@@ -124,13 +124,13 @@ The provided script supports APT-based (such as Debian and Ubuntu) and RPM-based
 
 As noted above, the `REGULARUSER` environmental variable will be provided by `install.py`, which is the name of your regular user. This value will be used to add your user to the `sudoers` list.
 
-Additionally, it accepts the `ROOTPASSWD` environmental variable, which should contain the password to set for the root account. If this is not specified, the password will be set to `toor`.
+Additionally, it accepts the `ROOTPASSWD` environmental variable, which should contain the password to set for the root account. If this is not specified, the root password will not be reset. On most distributions the root account has no password, i.e. it is locked.
 
 The script does the following:
 
 * Upgrades the system, installs some critical missing packages. (Such as `apt-utils` on Debian.)
 * Fixes locale warnings with apt/dpkg.
-* Resets the root password.
+* Resets the root password, if asked.
 * Installs `sudo` and adds user to `sudoers`.
 * Fixes sudo hostname resolution warning.
 * Installs basic dependencies required to install new distributions.

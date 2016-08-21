@@ -6,7 +6,7 @@
 #
 #   Accepts the following environmental variables:
 #       REGULARUSER -- name of your regular user; sent by install.py automatically.
-#       ROOTPASSWD  -- root password to set; defaults to 'toor' if nothing is set.
+#       ROOTPASSWD  -- root password to set; password is not reset if nothing is set.
 #
 #   Installs the following packages:
 #       locale, apt-utils, dialog -- Debian only, to fix apt/dpkg warnings
@@ -63,20 +63,17 @@ if [[ "${DEB}" == 1 ]]; then
 fi
 
 # fix root login by resetting the password
-# on debian:sid this works, on others it might require --stdin or chpasswd
+# this works on most distributions I tried, on others it might require --stdin or chpasswd
 
-log "Resetting root password..."
+if [[ ! -z "${ROOTPASSWD}" ]]; then
+	log "Resetting root password..."
 
-if [[ ! -f /usr/bin/passwd ]]; then
-	${mgr} install passwd
+	if [[ ! -f /usr/bin/passwd ]]; then
+		${mgr} install passwd
+	fi
+
+	echo -e "$ROOTPASSWD\n$ROOTPASSWD" | passwd
 fi
-
-if [[ -z "${ROOTPASSWD}" ]]; then
-	logwrn "Root password not specified via \e[94m\$ROOTPASSWD\e[39m; setting it to \e[92mtoor\e[39m."
-	ROOTPASSWD="toor"
-fi
-
-echo -e "$ROOTPASSWD\n$ROOTPASSWD" | passwd
 
 # install sudo and edit sudoers
 
