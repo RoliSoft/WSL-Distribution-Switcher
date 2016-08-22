@@ -16,7 +16,7 @@ if len(sys.argv) < 2:
 
 	# check if there are any installations
 
-	basedir = probe_wsl(True)
+	basedir, lxpath = probe_wsl(True)
 
 	if basedir:
 
@@ -59,7 +59,7 @@ image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 
 print('%s[*]%s Probing the Linux subsystem...' % (Fore.GREEN, Fore.RESET))
 
-basedir = probe_wsl()
+basedir, lxpath = probe_wsl()
 
 # read label of current distribution
 

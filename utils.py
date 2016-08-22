@@ -119,26 +119,38 @@ def probe_wsl(silent = False):
 
 	:type silent: Whether to print an error message or just return an empty string on failure.
 
-	:return: Path to the WSL directory.
+	:return: Paths to the WSL directory and lxrun/bash executables.
 	"""
 
 	basedir = os.path.join(os.getenv('LocalAppData'), 'lxss')
 
 	if not os.path.isdir(basedir):
 		if silent:
-			return None
+			return None, None
 
 		print('%s[!]%s The Linux subsystem is not installed. Please go through the standard installation procedure first.' % (Fore.RED, Fore.RESET))
 		exit(-1)
 
 	if os.path.exists(os.path.join(basedir, 'temp')):
 		if silent:
-			return None
+			return None, None
 
 		print('%s[!]%s The Linux subsystem is currently running. Please kill all instances before continuing.' % (Fore.RED, Fore.RESET))
 		exit(-1)
 
-	return basedir
+	lxpath  = ''
+	lxpaths = [os.path.join(os.getenv('SystemRoot'), 'sysnative'), os.path.join(os.getenv('SystemRoot'), 'System32')]
+
+	for path in lxpaths:
+		if os.path.exists(os.path.join(path, 'lxrun.exe')):
+			lxpath = path
+			break
+
+	if not lxpath and not silent:
+		print('%s[!]%s Unable to find %slxrun.exe%s in the expected locations.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
+		exit(-1)
+
+	return basedir, lxpath
 
 
 # get label of rootfs

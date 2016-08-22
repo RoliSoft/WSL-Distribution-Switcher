@@ -31,7 +31,7 @@ image, tag, fname, label = parse_image_arg(imgarg, True)
 
 print('%s[*]%s Probing the Linux subsystem...' % (Fore.GREEN, Fore.RESET))
 
-basedir = probe_wsl()
+basedir, lxpath = probe_wsl()
 
 user     = ''
 isroot   = False
@@ -43,7 +43,7 @@ homedirw = ''
 # ref: https://github.com/Microsoft/BashOnWindows/issues/2
 
 try:
-	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
+	subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
 	out = os.path.join(basedir, 'rootfs/tmp/.wsl_usr.txt')
 
 	if not os.path.isfile(out):
@@ -76,14 +76,14 @@ if not isroot:
 	print('%s[*]%s Switching default user to %sroot%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET))
 
 	try:
-		subprocess.check_output(['cmd', '/C', 'C:\\Windows\\sysnative\\lxrun.exe', '/setdefaultuser', 'root'])
+		subprocess.check_output(['cmd', '/C', lxpath + '\\lxrun.exe', '/setdefaultuser', 'root'])
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 		exit(-1)
 
 	try:
-		subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
+		subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
 		out = os.path.join(basedir, 'rootfs/tmp/.wsl_usr.txt')
 
 		if not os.path.isfile(out):
@@ -116,7 +116,7 @@ if not isroot:
 		print('%s[*]%s Switching default user back to %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
 
 		try:
-			subprocess.check_output(['cmd', '/C', 'C:\\Windows\\sysnative\\lxrun.exe', '/setdefaultuser', user])
+			subprocess.check_output(['cmd', '/C', lxpath + '\\lxrun.exe', '/setdefaultuser', user])
 
 		except subprocess.CalledProcessError as err:
 			print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
@@ -218,7 +218,7 @@ lsfname = os.path.abspath(fname)
 lsfname = '/mnt/' + lsfname[0].lower() + '/' + lsfname[3:].replace('\\', '/')
 
 try:
-	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~ && mkdir -p rootfs-temp && cd rootfs-temp && cp %s .' % lsfname])
+	subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'cd ~ && mkdir -p rootfs-temp && cd rootfs-temp && cp %s .' % lsfname])
 	pass
 
 except subprocess.CalledProcessError as err:
@@ -233,7 +233,7 @@ if fext == '.sfs' or fext == '.squashfs':
 	xtrcmd = 'unsquashfs -f -x -d . ' + fname
 
 try:
-	subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'cd ~/rootfs-temp && ' + xtrcmd])
+	subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'cd ~/rootfs-temp && ' + xtrcmd])
 	pass
 
 except subprocess.CalledProcessError as err:
@@ -366,7 +366,7 @@ if runhooks:
 			hookpath = os.path.join(homedirw, hookfile)
 
 			try:
-				subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'echo -n > /root/%s && chmod +x /root/%s' % (hookfile, hookfile)])
+				subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'echo -n > /root/%s && chmod +x /root/%s' % (hookfile, hookfile)])
 
 				if not os.path.isfile(hookpath):
 					print('%s[!]%s Failed to copy hook to WSL: File %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, hookpath, Fore.RESET))
@@ -385,7 +385,7 @@ if runhooks:
 				continue
 
 			try:
-				subprocess.check_call(['cmd', '/C', 'C:\\Windows\\sysnative\\bash.exe', '-c', 'REGULARUSER="%s" /root/%s' % (user if not isroot else '', hookfile)])
+				subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'REGULARUSER="%s" /root/%s' % (user if not isroot else '', hookfile)])
 
 			except subprocess.CalledProcessError as err:
 				print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
