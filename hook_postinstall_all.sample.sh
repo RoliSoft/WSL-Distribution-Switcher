@@ -57,6 +57,14 @@ if [[ "${DEB}" == 1 ]]; then
 	if [[ ! -f /etc/locale.gen ]] || ! grep -q -E "^\s*en_US\.UTF-8" /etc/locale.gen; then
 		log "Fixing locale warnings with apt/dpkg..."
 
+		if [[ -f /usr/share/i18n/charmaps/UTF-8.gz ]]; then
+			if [[ ! -f /bin/gzip ]]; then
+				${mgr} install gzip
+			fi
+
+			gzip -d /usr/share/i18n/charmaps/UTF-8.gz
+		fi
+
 		echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
 		locale-gen
 	fi
