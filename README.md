@@ -122,7 +122,9 @@ A sample global hook script is provided in `hook_postinstall_all.sample.sh`. If 
 
 The provided script supports APT-based (such as Debian and Ubuntu) and RPM-based (such as Fedora and CentOS) distributions. For all other distributions, it will gracefully terminate.
 
-As noted above, the `REGULARUSER` environmental variable will be provided by `install.py`, which is the name of your regular user. This value will be used to add your user to the `sudoers` list.
+As noted above, the `REGULARUSER` environmental variable will be provided by `install.py`, which is the name of your regular user. This value will be used to add your user to the corresponding sudo group, e.g. `sudo` on Debian/Ubuntu and `wheel` on Fedora/CentOS.
+
+If you would like your user to be added directly to `sudoers` with `NOPASSWD`, send `SUDONOPASSWD=1` as an environmental variable.
 
 Additionally, it accepts the `ROOTPASSWD` environmental variable, which should contain the password to set for the root account. If this is not specified, the root password will not be reset. On most distributions the root account has no password, i.e. it is locked.
 
@@ -131,7 +133,7 @@ The script does the following:
 * Upgrades the system, installs some critical missing packages. (Such as `apt-utils` on Debian.)
 * Fixes locale warnings with apt/dpkg.
 * Resets the root password, if asked.
-* Installs `sudo` and adds user to `sudoers`.
+* Installs `sudo` and adds user to corresponding `sudo` group or directly to `sudoers`.
 * Fixes sudo hostname resolution warning.
 * Installs basic dependencies required to install new distributions.
 * Installs git, vim, tmux.

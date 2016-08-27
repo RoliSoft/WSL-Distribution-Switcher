@@ -5,8 +5,9 @@
 #   Remove ".sample" from file name for install.py to run it automatically after installation.
 #
 #   Accepts the following environmental variables:
-#       REGULARUSER -- name of your regular user; sent by install.py automatically.
-#       ROOTPASSWD  -- root password to set; password is not reset if nothing is set.
+#       REGULARUSER  -- name of your regular user; sent by install.py automatically.
+#       ROOTPASSWD   -- root password to set; password is not reset if nothing is set.
+#       SUDONOPASSWD -- if set to "1", regular user will be added to sudoers with NOPASSWD.
 #
 #   Installs the following packages:
 #       locale, apt-utils, dialog -- Debian only, to fix apt/dpkg warnings
@@ -29,7 +30,7 @@ if [[ "${DEB}" == 1 ]]; then
 	export DEBIAN_FRONTEND=noninteractive
 	mgr="apt-get -y"
 elif [[ "${RPM}" == 1 ]]; then
-	if [[ -f /usr/bin/dnf ]]; then
+	if ! type -P dnf >/dev/null; then
 		mgr="dnf -y"
 		#if ! grep -q "fastestmirror=true" /etc/dnf/dnf.conf; then
 		#	echo -e "\nfastestmirror=true" >> /etc/dnf/dnf.conf
@@ -58,7 +59,7 @@ if [[ "${DEB}" == 1 ]]; then
 		log "Fixing locale warnings with apt/dpkg..."
 
 		if [[ -f /usr/share/i18n/charmaps/UTF-8.gz ]]; then
-			if [[ ! -f /bin/gzip ]]; then
+			if ! type -P gzip >/dev/null; then
 				${mgr} install gzip
 			fi
 
@@ -76,7 +77,7 @@ fi
 if [[ ! -z "${ROOTPASSWD}" ]]; then
 	log "Resetting root password..."
 
-	if [[ ! -f /usr/bin/passwd ]]; then
+	if ! type -P passwd >/dev/null; then
 		${mgr} install passwd
 	fi
 
@@ -87,12 +88,30 @@ fi
 
 log "Setting up sudo..."
 
-if [[ ! -f /usr/bin/sudo ]]; then
+if ! type -P sudo >/dev/null; then
 	${mgr} install sudo
 fi
 
-if [[ ! -z "${REGULARUSER}" ]] && ! grep -q -E "${REGULARUSER}.*?ALL.*?NOPASSWD.*?ALL" /etc/sudoers; then
-	echo -e "\n${REGULARUSER}   ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+if [[ ! -z "${REGULARUSER}" ]]; then
+	if [[ "${SUDONOPASSWD}" == "1" ]]; then
+		if ! grep -q -E "${REGULARUSER}.*?ALL.*?NOPASSWD.*?ALL" /etc/sudoers; then
+			echo -e "\n${REGULARUSER}   ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+		fi
+	else
+		group="sudo"
+		umpkg="passwd"
+
+		if [[ "${RPM}" == 1 ]]; then
+			group="wheel"
+			umpkg="shadow-utils"
+		fi
+
+		if ! type -P usermod >/dev/null; then
+			${mgr} install ${umpkg}
+		fi
+
+		usermod -aG "${group}" "${REGULARUSER}"
+	fi
 fi
 
 # fix sudo hostname resolution warning
