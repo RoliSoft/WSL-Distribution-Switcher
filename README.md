@@ -199,13 +199,13 @@ As mentioned before, switching is just 2 directory rename operations. However, W
 
 * ~~Check whether extracting the SquashFS files from within ISO images to a rootfs works as well as Docker's rootfs tarballs. If so, implement new installer to automate it.~~ Done, installer now supports SquashFS images as the first argument.
 
-* Figure out if it's possible to attach the Linux-specific metadata from outside of WSL, so then tarballs can be extracted and processed without invoking WSL.
+* ~~Implement hooks, so patches can be applied to fix WSL issues on a per-image basis, or just user-specific ones, such as preinstalling a few packages.~~ Done, see section "Post-install hook scripts".
 
-* Implement hooks, so patches can be applied to fix WSL issues on a per-image basis, or just user-specific ones, such as preinstalling a few packages.
+* Figure out if it's possible to attach the Linux-specific metadata from outside of WSL, so then tarballs can be extracted and processed without invoking WSL.
 
 ## Troubleshooting
 
-* __no root rights / no `sudo` / `su -l` returns `Authentication failure`__
+* __no root rights / no `sudo` / `su -l` fails with `Authentication failure`__
 
 The script migrates both your regular user and root's password, however, for some reason I found it to be not working perfectly with all distributions in case of root.
 
@@ -218,6 +218,16 @@ $ passwd
 ```
 
 Logging in with `su -l` as root should work now. If `passwd` is not available, you can install it with the package manager of the distribution. Same goes with `sudo`, just make sure to edit the `sudoers` with `visudo` to empower your regular account.
+
+* __`sudo` fails with `no tty present and no askpass program specified`__
+
+A workaround for this issue is to run it with `sudo -S`, which instructs sudo to read the password from stdin.
+
+You can add an alias for this workaround to your `.bash_profile`:
+
+```
+alias sudo="sudo -S"
+```
 
 * __get-source.py returns "Failed to find a suitable rootfs specification in Dockerfile."__
 
