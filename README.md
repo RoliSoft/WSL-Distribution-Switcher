@@ -120,7 +120,7 @@ To prevent the invocation of the hook scripts, specify the `--no-hooks` argument
 
 A sample global hook script is provided in `hook_postinstall_all.sample.sh`. If you would like to run this during all of your installations, remove the `.sample` from the file name.
 
-The provided script supports APT-based (such as Debian and Ubuntu) and RPM-based (such as Fedora and CentOS) distributions. For all other distributions, it will gracefully terminate.
+The provided script supports Arch Linux, APT-based (such as Debian and Ubuntu) and RPM-based (such as Fedora and CentOS) distributions. For all other distributions, it will gracefully terminate.
 
 As noted above, the `REGULARUSER` environmental variable will be provided by `install.py`, which is the name of your regular user. This value will be used to add your user to the corresponding sudo group, e.g. `sudo` on Debian/Ubuntu and `wheel` on Fedora/CentOS.
 
@@ -221,12 +221,37 @@ Logging in with `su -l` as root should work now. If `passwd` is not available, y
 
 * __`sudo` fails with `no tty present and no askpass program specified`__
 
-A workaround for this issue is to run it with `sudo -S`, which instructs sudo to read the password from stdin.
+This happens if your WSL is from the AU update. Subsequent Insider builds do not have this issue. A workaround for this issue is to run it with `sudo -S`, which instructs sudo to read the password from stdin.
 
 You can add an alias for this workaround to your `.bash_profile`:
 
 ```
 alias sudo="sudo -S"
+```
+
+* __`pacman` fails with `could not change the root directory (Function not implemented)`__
+
+This happens because WSL does not support `chroot()` at this time. A workaround for this issue, albeit not a clean solution, is to mock the `chroot()` function.
+
+To compile a library with a no-op `chroot()`, run:
+
+```
+echo 'int chroot(const char *path){return 0;}' > chroot.c
+gcc chroot.c -shared -fPIC -o libmockchroot.so
+```
+
+You can then inject this via `LD_PRELOAD`, during each command execution:
+
+```
+LD_PRELOAD=libmockchroot.so pacman ...
+```
+
+If you installed Arch Linux with the provided global hook script, such a library was already written to `/root/libmockchroot.so`, and you will not need to compile it manually.
+
+You can add an alias for this workaround to your `.bash_profile`:
+
+```
+alias pacman="LD_PRELOAD=/root/libmockchroot.so pacman"
 ```
 
 * __get-source.py returns "Failed to find a suitable rootfs specification in Dockerfile."__

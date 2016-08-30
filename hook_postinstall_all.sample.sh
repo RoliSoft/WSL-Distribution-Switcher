@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #   Sample global post-install hook for the WSL distribution switcher.
-#   Supports APT (Debian, Ubuntu..) and RPM-based (Fedora, CentOS..) distributions.
+#   Supports Arch Linux, APT (Debian, Ubuntu..) and RPM-based (Fedora, CentOS..) distributions.
 #   Remove ".sample" from file name for install.py to run it automatically after installation.
 #
 #   Accepts the following environmental variables:
@@ -12,7 +12,7 @@
 #   Installs the following packages:
 #       locale, apt-utils, dialog -- Debian only, to fix apt/dpkg warnings
 #       passwd, sudo -- Both, changes root password and adds regular user to sudoers
-#       tar, gzip, bzip2, xz, squashfs-tools, vim, git, tmux -- Both, but not crucial per-se
+#       tar, gzip, bzip2, xz, squashfs-tools, vim, git, tmux, curl, wget -- Both, but not crucial per-se
 #
 
 logerr () { echo -e "\e[91m[!]\e[39m $@" 1>&2; }
@@ -25,10 +25,12 @@ log "Detecting operating system..."
 
 DEB=$(test -f /usr/bin/dpkg && /usr/bin/dpkg --search /usr/bin/dpkg >> /dev/null 2>&1; test "$?" != "0"; echo "$?")
 RPM=$(test -f /usr/bin/rpm && /usr/bin/rpm -q -f /usr/bin/rpm >> /dev/null 2>&1; test "$?" != "0"; echo "$?")
+PAC=$(test -f /usr/bin/pacman && /usr/bin/pacman -Qo /usr/bin/pacman >> /dev/null 2>&1; test "$?" != "0"; echo "$?")
 
 if [[ "${DEB}" == 1 ]]; then
 	export DEBIAN_FRONTEND=noninteractive
 	mgr="apt-get -y"
+	mgrinst="${mgr} install"
 elif [[ "${RPM}" == 1 ]]; then
 	if ! type -P dnf >/dev/null; then
 		mgr="dnf -y"
@@ -38,6 +40,23 @@ elif [[ "${RPM}" == 1 ]]; then
 	else
 		mgr="yum -y"
 	fi
+	mgrinst="${mgr} install"
+elif [[ "${PAC}" == 1 ]]; then
+	mgr="pacman --noconfirm"
+	mgrinst="${mgr} -S"
+
+	# fake chroot() in order to prevent installation failures:
+	echo '/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4BdPBNddAD+RRYRoPYmm2orhgzJO2QSUh1Ilea0Hqf4n5/VkVmV4LG9rbFIVZpKGk2uZnYmbqXh7ZxJIWnXoP3BDp42H8DNvYVufvmBKsWmh9DYoUb9e4yV7fskyJhMGXTrtwYfF3acVqBdX6to3Tn+ZBb//X/Snr/gbjaKubb33c8qSowjVJEioaMGkhowfrcFylqKEtGIZQDVn1ZpG2jy6/F3TsS0eds2NdbAkyVyHLdZBpwFnNV/BUVA+ZJOPWzM9kmuM+FS6Y9aib+RKcxIc2pZgGpLPSbniyak50Z46gOgcWaOVaymRpq4dzPsa5zexFlyn7GPWz+K1h2JMYknLyAvuYiebgH1HAEBtjGRotTTtC8RxrVe/Z8GlfJrEyRaNKpJOmi2yDwONNPkXmTFN2dOtcaEiEB5TNOugCOCoxwhSjeJ5HVWyaG4578iPCx1gTveQMfXvGwvd4+W51PxJPLAy0VKN/5IHcupZbXhRV3h99Jf85jjM363cqeyvXIrscU/w0wfWuGY9wjHGcDnNlFk9v+oIyqxQzvHW0x2FhNnBfhogz4fvk2mPgvuG8PfNV4sVZZm00krY+RPHvvU2qmbUDHLccdfrGGAGrnYBkV+E9I0YBmukB7iQnPwcBwmegz0O7mfAb2ati5jbAzJsJiaaw7ikfc5lXX/cZLPxftKkK3rTPQf4CHpYJtYjvaboB3Vg7qMTTU6BprhCrr7xBbWWHTfCdEFOFsU7zGnl3q1/qCoeVT5+Rr9QUn2UGbbeibBMl9oIVjemlTWDZ5O+16Kz0C3mAbN7lP3CZadHQhdQAOAtjOdgDPOlBHD/7DunFncMU6kyUQ5qg6WlLdq5W/0BXbRBsIBxq4GhFBjaN5JrmsXUN1GQfWgMYrw63lm1AkrSTVfH/mJm+rUWrMHRxIMWAZw+AJXx1uvn5PbJ2HMA7KTJsdl/6kcbAc7BCGmNNliOllyiTM5rspozU2EphDT+qCGItgQQp0Md1nq9h5UnVp6lggH8Ikh9GFpkiiQNb+vwqTmEzLI386MCA2NDGjijnh0zxOVh/vqosfceSk/ADeQJ4KjmcrzIOZ/F6L+5gl482NyXt0SVOnNrwxtXcBPjwyNq1NLbX8d8+h/IGJeAfJlct7k/h9tuBFB/F4b9ucdZ4SlYLMcDnJmyZaUWPqa2bmRPBsOzjwjenLM1f0WMqGn6yqcaklwyaXBNkJjBdLHn1jG9eUAEWWh4nzsPFkp9Jf3OxqukJnYCzQ/eTJPTSwks3YmrMDGvkRfaZjAsRMPOt1KNCPdqC+j9dpYatjxRN95NvMgt09EWrWNt4HDjXcgx7QwvwtlCdbgAUoP5Odo3XNCFbXZzuqQkTJHyVA8pLPIZ0nN9xF+wasWaZ+m8HqhBZAMj1NV9Qgm2c6p8x5pNFZY4gJrDnO5MmlMSW+cR6IVS9X5Iowr4FO9HIIXH25sbO0EuGw2dILfF30JzIJIs6m5W7vxD8Nqb9oYfCiUbz40ETsq/x9vXgJ4yTO64CPg5J26GuFxAZJsxyO2kuupjPcpVoVUOF6nBPqIVRj1MUOgktZxT1ZKtIz3K1AR4HzKDn1bjKyiNx5Pc2osQzdtf8usfgQgIp3UCLvqcCEVIrNWS+hTc1r0J6eliP5R3a8T1c49loq5PJQAA5OFQ5XQD0PQAAfMJ0C4AAGgPxEmxxGf7AgAAAAAEWVo=' | base64 -d | xz -d > /root/libmockchroot.so
+	export LD_PRELOAD=/root/libmockchroot.so
+
+	# temporary workaround by @goreliu at
+	#   https://github.com/Microsoft/BashOnWindows/issues/8#issuecomment-240026910
+	# it's shipped as a binary blob, since otherwise it would require gcc to compile,
+	# which is not available before pacman is set up. to recreate blob above, run:
+	#   echo 'int chroot(const char *path){return 0;}' > chroot.c
+	#   gcc chroot.c -shared -fPIC -o libmockchroot.so
+	#   strip -s libmockchroot.so
+	#   cat libmockchroot.so | xz | base64
 else
 	echo "Unsupported operating system." 1>&2; exit 1
 fi
@@ -50,25 +69,32 @@ if [[ "${DEB}" == 1 ]]; then
 	${mgr} update && ${mgr} dist-upgrade && ${mgr} install apt-utils dialog locales
 elif [[ "${RPM}" == 1 ]]; then
 	${mgr} upgrade
+elif [[ "${PAC}" == 1 ]]; then
+	${mgr} -Sy
+	${mgrinst} archlinux-keyring
+	${mgr} -Su
+	pacman-db-upgrade
+	${mgrinst} ca-certificates-mozilla
 fi
 
-# fix perl locale warnings with apt/dpkg
+# fix locale warnings
 
-if [[ "${DEB}" == 1 ]]; then
-	if [[ ! -f /etc/locale.gen ]] || ! grep -q -E "^\s*en_US\.UTF-8" /etc/locale.gen; then
-		log "Fixing locale warnings with apt/dpkg..."
+if [[ "${DEB}" == 1 || "${PAC}" == 1 ]]; then
+	log "Fixing locale warnings..."
 
-		if [[ -f /usr/share/i18n/charmaps/UTF-8.gz ]]; then
-			if ! type -P gzip >/dev/null; then
-				${mgr} install gzip
-			fi
-
-			gzip -d /usr/share/i18n/charmaps/UTF-8.gz
+	if [[ -f /usr/share/i18n/charmaps/UTF-8.gz ]]; then
+		if ! type -P gzip >/dev/null; then
+			${mgrinst} gzip
 		fi
 
-		echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-		locale-gen
+		gzip -d /usr/share/i18n/charmaps/UTF-8.gz
 	fi
+
+	if ! grep -q -E "^\s*en_US\.UTF-8" /etc/locale.gen; then
+		echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+	fi
+
+	locale-gen
 fi
 
 # fix root login by resetting the password
@@ -78,7 +104,7 @@ if [[ ! -z "${ROOTPASSWD}" ]]; then
 	log "Resetting root password..."
 
 	if ! type -P passwd >/dev/null; then
-		${mgr} install passwd
+		${mgrinst} passwd
 	fi
 
 	echo -e "$ROOTPASSWD\n$ROOTPASSWD" | passwd
@@ -89,7 +115,7 @@ fi
 log "Setting up sudo..."
 
 if ! type -P sudo >/dev/null; then
-	${mgr} install sudo
+	${mgrinst} sudo
 fi
 
 if [[ ! -z "${REGULARUSER}" ]]; then
@@ -101,13 +127,17 @@ if [[ ! -z "${REGULARUSER}" ]]; then
 		group="sudo"
 		umpkg="passwd"
 
-		if [[ "${RPM}" == 1 ]]; then
+		if [[ "${DEB}" != 1 ]]; then
 			group="wheel"
 			umpkg="shadow-utils"
+
+			if ! grep -q -E "^\s*%wheel" /etc/sudoers && grep -q -E "^\s*#\s*%wheel" /etc/sudoers; then
+				sed -i '0,/%wheel/{s/^\s*#\s*//}' /etc/sudoers
+			fi
 		fi
 
 		if ! type -P usermod >/dev/null; then
-			${mgr} install ${umpkg}
+			${mgrinst} ${umpkg}
 		fi
 
 		usermod -aG "${group}" "${REGULARUSER}"
@@ -127,8 +157,8 @@ log "Installing tools..."
 
 if [[ "${DEB}" == 1 ]]; then
 	distspec="xz-utils"
-elif [[ "${RPM}" == 1 ]]; then
+elif [[ "${RPM}" == 1 || "${PAC}" == 1 ]]; then
 	distspec="xz"
 fi
 
-${mgr} install vim tmux git tar gzip bzip2 squashfs-tools ${distspec}
+${mgrinst} vim tmux git curl wget tar gzip bzip2 squashfs-tools ${distspec}
