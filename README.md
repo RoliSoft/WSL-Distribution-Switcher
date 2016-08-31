@@ -135,6 +135,7 @@ The script does the following:
 * Resets the root password, if asked.
 * Installs `sudo` and adds user to corresponding `sudo` group or directly to `sudoers`.
 * Fixes sudo hostname resolution warning.
+* Installs patched `fakeroot` on Arch for `makepkg`.
 * Installs basic dependencies required to install new distributions.
 * Installs git, vim, tmux.
 
