@@ -5,14 +5,15 @@
 #   Remove ".sample" from file name for install.py to run it automatically after installation.
 #
 #   Accepts the following environmental variables:
-#       REGULARUSER  -- name of your regular user; sent by install.py automatically.
-#       ROOTPASSWD   -- root password to set; password is not reset if nothing is set.
-#       SUDONOPASSWD -- if set to "1", regular user will be added to sudoers with NOPASSWD.
+#       REGULARUSER   -- name of your regular user; sent by install.py automatically.
+#       ROOTPASSWD    -- root password to set; password is not reset if nothing is set.
+#       SUDONOPASSWD  -- if set to "1", regular user will be added to sudoers with NOPASSWD.
+#       WITHOUTPACAUR -- if set to "1", AUR helper pacaur will not be installed under Arch.
 #
 #   Installs the following packages:
 #       locale, apt-utils, dialog -- Debian only, to fix apt/dpkg warnings
 #       passwd, sudo -- Both, changes root password and adds regular user to sudoers
-#       fakeroot, base-devel -- Arch Linux only, patched fakeroot to use TCP instead of Unix sockets
+#       fakeroot, pacaur, base-devel -- Arch Linux only, patched fakeroot to use TCP instead of Unix sockets
 #       tar, gzip, bzip2, xz, squashfs-tools, vim, git, tmux, curl, wget -- Both, but not crucial per-se
 #
 
@@ -176,12 +177,12 @@ if [[ "${PAC}" == 1 ]]; then
 	# download and compile the fakeroot-tcp version from AUR
 
 	pushd $(mktemp -d)
-	git clone https://aur.archlinux.org/fakeroot-tcp.git && cd fakeroot-tcp
+	git clone https://aur.archlinux.org/fakeroot-tcp.git --depth=1 && cd fakeroot-tcp
 
 	# patch mkpkg to run as root temporarily and build package
 
 	sed -i 's/EUID\s*==\s*0/EUID == 99999/' /usr/bin/makepkg
-	makepkg -s
+	makepkg -s --noconfirm
 	sed -i 's/EUID\s*==\s*99999/EUID == 0/' /usr/bin/makepkg
 
 	# switch fakeroot package
@@ -192,6 +193,40 @@ if [[ "${PAC}" == 1 ]]; then
 	# cleanup
 
 	cd .. && rm -rf fakeroot-tcp
+	popd
+fi
+
+# install pacaur for Arch
+
+if [[ "${PAC}" == 1 && "${WITHOUTPACAUR}" != "1" ]]; then
+	log "Installing pacaur..."
+
+	# preinstall pacaur dependencies, otherwise it might try to replace
+	# fakeroot-tcp with the original fakeroot
+
+	${mgrinst} yajl expac
+
+	gpg --keyserver hkp://pool.sks-keyservers.net --recv-keys 487EACC08557AD082088DABA1EB2638FF56C0C53
+
+	export PATH="/usr/bin/core_perl:$PATH"
+	pushd $(mktemp -d)
+
+	sed -i 's/EUID\s*==\s*0/EUID == 99999/' /usr/bin/makepkg
+
+	# download and compile cower
+
+	git clone https://aur.archlinux.org/cower.git --depth=1 && cd cower
+	makepkg -si --noconfirm
+	cd .. && rm -rf cower
+
+	# download and compile pacaur
+
+	git clone https://aur.archlinux.org/pacaur.git --depth=1 && cd pacaur
+	makepkg -si --noconfirm
+	cd .. && rm -rf pacaur
+
+	sed -i 's/EUID\s*==\s*99999/EUID == 0/' /usr/bin/makepkg
+
 	popd
 fi
 

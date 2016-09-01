@@ -128,6 +128,8 @@ If you would like your user to be added directly to `sudoers` with `NOPASSWD`, s
 
 Additionally, it accepts the `ROOTPASSWD` environmental variable, which should contain the password to set for the root account. If this is not specified, the root password will not be reset. On most distributions the root account has no password, i.e. it is locked.
 
+On Arch Linux, the AUR helper `pacaur` will be installed unless `WITHOUTPACAUR=1` is set as an environmental variable.
+
 The script does the following:
 
 * Upgrades the system, installs some critical missing packages. (Such as `apt-utils` on Debian.)
@@ -135,7 +137,7 @@ The script does the following:
 * Resets the root password, if asked.
 * Installs `sudo` and adds user to corresponding `sudo` group or directly to `sudoers`.
 * Fixes sudo hostname resolution warning.
-* Installs patched `fakeroot` for `makepkg` and `chroot()` faker for `pacman` on Arch.
+* Installs `pacaur`, patched `fakeroot` for `makepkg` and `chroot()` faker for `pacman` on Arch.
 * Installs basic dependencies required to install new distributions.
 * Installs git, vim, tmux.
 
@@ -250,6 +252,12 @@ LD_PRELOAD=libmockchroot.so pacman ...
 If you installed Arch Linux with the provided global hook script, such a library was already written to `/lib64/libmockchroot.so` and added to `/etc/ld.so.preload`, so you will not need to compile it manually or specify it everytime with `LD_PRELOAD`.
 
 This preinstalled version only affects `pacman`. You can view its source and compilation instructions in the [libmockchroot.so](https://gist.github.com/RoliSoft/84813cc353caec614dee8bf74c1b09ef) gist.
+
+* __`pacaur`/`makepkg` prints `dlsym(acl\_get\_fd): ...: undefined symbol: acl\_get\_fd`__
+
+These lines are printed by `fakeroot-tcp`, and they are just warnings about some non-existant functions under WSL, which fakeroot then fails to mock.
+
+You should be fine, as long as those functions are not used by the command and are not critical to its execution.
 
 * __get-source.py returns "Failed to find a suitable rootfs specification in Dockerfile."__
 
