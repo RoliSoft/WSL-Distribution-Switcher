@@ -135,7 +135,7 @@ The script does the following:
 * Resets the root password, if asked.
 * Installs `sudo` and adds user to corresponding `sudo` group or directly to `sudoers`.
 * Fixes sudo hostname resolution warning.
-* Installs patched `fakeroot` on Arch for `makepkg`.
+* Installs patched `fakeroot` for `makepkg` and `chroot()` faker for `pacman` on Arch.
 * Installs basic dependencies required to install new distributions.
 * Installs git, vim, tmux.
 
@@ -247,13 +247,9 @@ You can then inject this via `LD_PRELOAD`, during each command execution:
 LD_PRELOAD=libmockchroot.so pacman ...
 ```
 
-If you installed Arch Linux with the provided global hook script, such a library was already written to `/root/libmockchroot.so`, and you will not need to compile it manually.
+If you installed Arch Linux with the provided global hook script, such a library was already written to `/lib64/libmockchroot.so` and added to `/etc/ld.so.preload`, so you will not need to compile it manually or specify it everytime with `LD_PRELOAD`.
 
-You can add an alias for this workaround to your `.bash_profile`:
-
-```
-alias pacman="LD_PRELOAD=/root/libmockchroot.so pacman"
-```
+This preinstalled version only affects `pacman`. You can view its source and compilation instructions in the [libmockchroot.so](https://gist.github.com/RoliSoft/84813cc353caec614dee8bf74c1b09ef) gist.
 
 * __get-source.py returns "Failed to find a suitable rootfs specification in Dockerfile."__
 
