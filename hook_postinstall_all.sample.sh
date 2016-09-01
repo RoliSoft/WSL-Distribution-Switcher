@@ -86,10 +86,11 @@ elif [[ "${PAC}" == 1 ]]; then
 	# switch primitive chroot mocker which always returns true,
 	# to fakechroot which actually rewrites the paths
 
-	echo '/usr/lib/libfakeroot/fakechroot/libfakechroot.so' > /etc/ld.so.preload
+	echo '/lib64/libmockchroot.so' > /etc/ld.so.preload
 
 	# continue with system upgrade
-
+	pacman-key --init
+	pacman-key --populate archlinux
 	${mgr} -Su
 	pacman-db-upgrade
 	${mgr} -S ca-certificates-mozilla
