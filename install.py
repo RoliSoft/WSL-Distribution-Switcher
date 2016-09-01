@@ -218,7 +218,7 @@ lsfname = os.path.abspath(fname)
 lsfname = '/mnt/' + lsfname[0].lower() + '/' + lsfname[3:].replace('\\', '/')
 
 try:
-	subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'cd ~ && mkdir -p rootfs-temp && cd rootfs-temp && cp %s .' % lsfname])
+	subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'cd ~ && mkdir -p rootfs-temp && cd rootfs-temp && cp "%s" .' % lsfname])
 	pass
 
 except subprocess.CalledProcessError as err:
