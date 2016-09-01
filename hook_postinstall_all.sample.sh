@@ -55,9 +55,9 @@ elif [[ "${PAC}" == 1 ]]; then
 
 	sed -i 's/^#Color$/Color/' /etc/pacman.conf
 
-	# fake chroot() for pacman in order to prevent installation failures
+	# fake chroot() for pacman in order to prevent installation failures during initial update
 	echo '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' | base64 -d | xz -d > /lib64/libmockchroot.so
-	echo '/lib64/libmockchroot.so' >> /etc/ld.so.preload
+	echo '/lib64/libmockchroot.so' > /etc/ld.so.preload
 
 	# it's shipped as a binary blob, since otherwise it would require gcc to compile,
 	# which is not available before pacman is set up. to recreate blob above, run:
@@ -78,8 +78,18 @@ if [[ "${DEB}" == 1 ]]; then
 elif [[ "${RPM}" == 1 ]]; then
 	${mgr} upgrade
 elif [[ "${PAC}" == 1 ]]; then
+	# update db and install super-essentials
+
 	${mgr} -Sy
-	${mgrinst} archlinux-keyring
+	${mgrinst} archlinux-keyring fakechroot
+
+	# switch primitive chroot mocker which always returns true,
+	# to fakechroot which actually rewrites the paths
+
+	echo '/usr/lib/libfakeroot/fakechroot/libfakechroot.so' > /etc/ld.so.preload
+
+	# continue with system upgrade
+
 	${mgr} -Su
 	pacman-db-upgrade
 	${mgr} -S ca-certificates-mozilla
