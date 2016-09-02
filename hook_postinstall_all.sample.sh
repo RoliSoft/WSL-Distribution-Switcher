@@ -176,33 +176,34 @@ if [[ "${PAC}" == 1 ]]; then
 
 	# install original fakeroot and dependencies for makepkg
 
-	${mgrinst} base-devel git
+	${mgrinst} base-devel git po4a
 
 	# overwrite standard fakeroot with a temporary pass-through script
 	# since we are root at this point, the bypass script has no side-effect
 
 	echo -e '#!/bin/bash\nif [[ "$1" == "-v" ]]; then\n\techo 1.0; exit\nfi\nexport FAKEROOTKEY=1\nexec "$@"\nunset FAKEROOTKEY' > /usr/bin/fakeroot
 	chmod +x /usr/bin/fakeroot
+	export PATH="/usr/bin/core_perl:/usr/bin/vendor_perl:$PATH"
 
-	# download and compile the fakeroot-tcp version from AUR
+	# download and patch the fakeroot package from ABS
 
 	pushd $(mktemp -d)
-	git clone https://aur.archlinux.org/fakeroot-tcp.git --depth=1 && cd fakeroot-tcp
+	git clone git://git.archlinux.org/svntogit/packages.git --depth=1 --branch=packages/fakeroot && cd packages/trunk
+	sed -i 's/--with-ipc=sysv$/--with-ipc=tcp/' PKGBUILD
 
 	# patch mkpkg to run as root temporarily and build package
 
 	sed -i 's/EUID\s*==\s*0/EUID == 99999/' /usr/bin/makepkg
-	makepkg -s --noconfirm
+	makepkg -si --noconfirm
 	sed -i 's/EUID\s*==\s*99999/EUID == 0/' /usr/bin/makepkg
 
-	# switch fakeroot package
+	# update pacman config to ignore fakeroot updates, as those use --with-ipc=sysv
 
-	${mgr} -R fakeroot
-	${mgr} -U fakeroot-tcp-*.pkg.tar.xz
+	sed -i -e 's/IgnorePkg\s*=/IgnorePkg = fakeroot /' -e 's/^\s*#\s*IgnorePkg/IgnorePkg/' /etc/pacman.conf
 
 	# cleanup
 
-	cd .. && rm -rf fakeroot-tcp
+	cd ../.. && rm -rf packages
 	popd
 fi
 
@@ -211,14 +212,11 @@ fi
 if [[ "${PAC}" == 1 && "${WITHOUTPACAUR}" != "1" ]]; then
 	log "Installing pacaur..."
 
-	# preinstall pacaur dependencies, otherwise it might try to replace
-	# fakeroot-tcp with the original fakeroot
+	# preinstall pacaur dependencies
 
 	${mgrinst} yajl expac
 
 	gpg --keyserver hkp://pool.sks-keyservers.net --recv-keys 487EACC08557AD082088DABA1EB2638FF56C0C53
-
-	export PATH="/usr/bin/core_perl:$PATH"
 	pushd $(mktemp -d)
 
 	sed -i 's/EUID\s*==\s*0/EUID == 99999/' /usr/bin/makepkg
