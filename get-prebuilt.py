@@ -13,14 +13,15 @@ if len(sys.argv) < 2:
 
 image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 
-token = ''
+fimage = image if '/' in image else 'library/' + image
+token  = ''
 
 # get auth token to Docker Hub
 
 print('%s[*]%s Requesting authorization token...' % (Fore.GREEN, Fore.RESET))
 
 try:
-	with urllib.request.urlopen('https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull' % image) as f:
+	with urllib.request.urlopen('https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull' % fimage) as f:
 
 		data  = json.loads(f.read().decode('utf-8'))
 		token = data['token']
@@ -40,7 +41,7 @@ print('%s[*]%s Fetching manifest info for %s%s%s:%s%s%s...' % (Fore.GREEN, Fore.
 manifest = {}
 
 try:
-	r = urllib.request.Request('https://registry.hub.docker.com/v2/%s/manifests/%s' % (image, tag))
+	r = urllib.request.Request('https://registry.hub.docker.com/v2/%s/manifests/%s' % (fimage, tag))
 	r.add_header('Authorization', 'Bearer ' + token)
 
 	with urllib.request.urlopen(r) as f:
@@ -69,7 +70,7 @@ for layer in manifest['fsLayers']:
 	print('%s[*]%s Downloading layer %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, layer['blobSum'], Fore.RESET))
 
 	try:
-		r = urllib.request.Request('https://registry.hub.docker.com/v2/%s/blobs/%s' % (image, layer['blobSum']))
+		r = urllib.request.Request('https://registry.hub.docker.com/v2/%s/blobs/%s' % (fimage, layer['blobSum']))
 		r.add_header('Authorization', 'Bearer ' + token)
 
 		with urllib.request.urlopen(r) as u, open(fname, 'ab') as f:
