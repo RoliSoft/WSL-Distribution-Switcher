@@ -282,6 +282,7 @@ def chunked_copy(name, source, dest):
 
 	if not sys.platform == 'win32':
 		sys.stdout.write('\033[?25l')
+		conemu = False
 
 	else:
 		ci = ConsoleCursorInfo()
@@ -289,6 +290,7 @@ def chunked_copy(name, source, dest):
 		ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(ci))
 		ci.visible = False
 		ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
+		conemu = os.environ.get('ConEmuANSI') == 'ON'
 
 	while True:
 		chunk = source.read(8192)
@@ -302,10 +304,17 @@ def chunked_copy(name, source, dest):
 		pct = round(recv / size * 100, 2)
 		bar = int(50 * recv / size)
 		sys.stdout.write('\r    %s [%s>%s] %0.2f%%' % (name, '=' * bar, ' ' * (50 - bar), pct))
+
+		if conemu:
+			sys.stdout.write('\033]9;4;1;%0.0f\033\\\033[39m' % pct)
+
 		sys.stdout.flush()
 
 		if recv >= size:
 			sys.stdout.write('\r%s\r' % (' ' * (66 + len(name))))
+
+			if conemu:
+				sys.stdout.write('\033]9;4;0\033\\\033[39m')
 
 	if not sys.platform == 'win32':
 		sys.stdout.write('\033[?25h')
