@@ -37,7 +37,7 @@ if [[ "${DEB}" == 1 ]]; then
 
 	echo -e 'Dpkg::Progress-Fancy "1";\nAPT::Color "1";' >> /etc/apt/apt.conf.d/99progressbar
 elif [[ "${RPM}" == 1 ]]; then
-	if ! type -P dnf >/dev/null; then
+	if type -P dnf >/dev/null; then
 		mgr="dnf -y"
 
 		echo -e "\ncolor=always" >> /etc/dnf/dnf.conf
