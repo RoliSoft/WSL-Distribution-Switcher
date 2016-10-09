@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # coding=utf-8
 import sys
-import time
+import stat
 import atexit
 import shutil
+import tarfile
 import os.path
 import subprocess
-from utils import Fore, parse_image_arg, probe_wsl, get_label
+from utils import Fore, parse_image_arg, probe_wsl, get_label, ProgressFileObject, show_cursor
+from ntfsea import ntfsea, lxattrb
+
 
 # handle arguments
 
@@ -68,78 +71,6 @@ try:
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
-
-# switch to root, if regular user
-
-if not isroot:
-
-	print('%s[*]%s Switching default user to %sroot%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET))
-
-	try:
-		subprocess.check_output(['cmd', '/C', lxpath + '\\lxrun.exe', '/setdefaultuser', 'root'])
-
-	except subprocess.CalledProcessError as err:
-		print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
-		exit(-1)
-
-	try:
-		subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
-		out = os.path.join(basedir, 'rootfs/tmp/.wsl_usr.txt')
-
-		if not os.path.isfile(out):
-			print('%s[!]%s Failed to get home directory of default user in WSL: Output file %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, out, Fore.RESET))
-			exit(-1)
-
-		with open(out) as f:
-			homedir  = f.readline().strip()
-			homedirw = os.path.join(basedir, homedir.lstrip('/'))
-
-			if len(homedir) == 0 or not os.path.isdir(homedirw):
-				print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
-				exit(-1)
-
-			user2 = f.readline().strip()
-
-			if user2 != 'root':
-				print('%s[!]%s Failed to switch default user to %sroot%s.' % (Fore.RED, Fore.RESET, Fore.YELLOW, Fore.RESET))
-				exit(-1)
-
-		os.unlink(out)
-
-	except subprocess.CalledProcessError as err:
-		print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
-		exit(-1)
-
-	# since we switched to root, switch back to regular user on exit
-
-	def switch_user_back(user):
-		print('%s[*]%s Switching default user back to %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
-
-		try:
-			subprocess.check_output(['cmd', '/C', lxpath + '\\lxrun.exe', '/setdefaultuser', user])
-
-		except subprocess.CalledProcessError as err:
-			print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
-			exit(-1)
-
-	atexit.register(switch_user_back, user)
-
-# check squashfs prerequisites
-
-fext = os.path.splitext(fname)[-1].lower()
-
-if fext == '.sfs' or fext == '.squashfs':
-	paths = ['usr/local/sbin', 'usr/local/bin', 'usr/sbin', 'usr/bin', 'sbin', 'bin']
-	found = False
-
-	for path in paths:
-		if os.path.isfile(os.path.join(basedir, 'rootfs', path, 'unsquashfs')):
-			found = True
-			break
-
-	if not found:
-		print('%s[!]%s Failed to find %sunsquashfs%s in the current WSL distribution. Install it with %sapt-get install squashfs-tools%s for SquashFS support.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
-		exit(-1)
 
 # get /etc/{passwd,shadow,group,gshadow} entries
 
@@ -210,51 +141,57 @@ if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
 
 	shutil.rmtree(os.path.join(homedirw, 'rootfs-temp'), True)
 
-# move archive and extract it
-
-print('%s[*]%s Copying %s%s%s to %s%s/rootfs-temp%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, fname, Fore.RESET, Fore.GREEN, homedir, Fore.RESET))
-
-lsfname = os.path.abspath(fname)
-lsfname = '/mnt/' + lsfname[0].lower() + '/' + lsfname[3:].replace('\\', '/')
-
-try:
-	subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'cd ~ && mkdir -p rootfs-temp && cd rootfs-temp && cp "%s" .' % lsfname])
-	pass
-
-except subprocess.CalledProcessError as err:
-	print('%s[!]%s Failed to copy archive to WSL: %s' % (Fore.RED, Fore.RESET, err))
-	exit(-1)
+# extract archive
 
 print('%s[*]%s Beginning extraction...' % (Fore.GREEN, Fore.RESET))
 
-xtrcmd = 'tar xfp %s --ignore-zeros --exclude=\'dev/*\'' % fname
+fileobj = ProgressFileObject(fname)
 
-if fext == '.sfs' or fext == '.squashfs':
-	xtrcmd = 'unsquashfs -f -x -d . ' + fname
+def iterfiles(files, path):
+	global fileobj
+
+	for file in files:
+
+		# extract file
+
+		file.name = file.name.lstrip('./')
+		fileobj.current_extraction = file.name
+		file.name = path + '/' + file.name
+
+		if file.issym() or file.islnk():
+
+			# create symlink manually
+
+			with open(file.name, 'w') as link:
+				link.write(file.linkname)
+		else:
+
+			# send file for extraction
+
+			yield file
+
+		# apply lxattrb
+
+		try:
+			os.chmod(file.name, stat.S_IWRITE)
+		except WindowsError as err:
+			print('%s[!]%s Failed to extract %s: %s' % (Fore.YELLOW, Fore.RESET, fileobj.current_extraction, err))
+			pass
+
+		attrb = lxattrb.fromtar(file).generate()
+		ntfsea.writeattr(file.name, 'lxattrb', attrb)
 
 try:
-	subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'cd ~/rootfs-temp && ' + xtrcmd])
-	pass
+	with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = True, errorlevel = 2) as tar:
+		ntfsea.init()
+		tar.extractall(members = iterfiles(tar, os.path.join(homedirw, 'rootfs-temp')))
 
-except subprocess.CalledProcessError as err:
-	print('%s[!]%s Failed to extract archive in WSL: %s' % (Fore.RED, Fore.RESET, err))
-	print('%s[!]%s If the installation failed due to missing applications, you can try switching back to the default distribution by running %sswitch.py ubuntu:trusty%s and if it still fails, try installing all the dependencies with %sapt-get install tar gzip bzip2 xz-utils squashfs-tools%s from within WSL.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
+except Exception as err:
+	print('%s[!]%s Failed to extract archive: %s' % (Fore.RED, Fore.RESET, err))
 	exit(-1)
 
-try:
-	os.unlink(os.path.join(homedirw, 'rootfs-temp', fname))
-except:
-	pass
-
-# wait for WSL to exit
-
-print('%s[*]%s Waiting for the Linux subsystem to exit...' % (Fore.GREEN, Fore.RESET))
-
-while True:
-	time.sleep(5)
-
-	if not os.path.exists(os.path.join(basedir, 'temp')):
-		break
+finally:
+	show_cursor()
 
 # read label of current distribution
 
@@ -352,9 +289,79 @@ if not isroot:
 	except OSError as err:
 		print('%s[!]%s Failed to open file %s/etc/gshadow%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 
-# run post-install hooks, if any
+# check if post-install hooks exist
+
+havehooks = False
 
 if runhooks:
+	hooks = ['all', image, image + '_' + tag]
+
+	for hook in hooks:
+		hookfile = 'hook_postinstall_%s.sh' % hook
+
+		if os.path.isfile(hookfile):
+			havehooks = True
+			break
+
+# switch to root, if regular user and have hooks
+
+if not isroot and havehooks:
+
+	print('%s[*]%s Switching default user to %sroot%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET))
+
+	try:
+		subprocess.check_output(['cmd', '/C', lxpath + '\\lxrun.exe', '/setdefaultuser', 'root'])
+
+	except subprocess.CalledProcessError as err:
+		print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
+		exit(-1)
+
+	try:
+		subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c',
+		                       'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
+		out = os.path.join(basedir, 'rootfs/tmp/.wsl_usr.txt')
+
+		if not os.path.isfile(out):
+			print('%s[!]%s Failed to get home directory of default user in WSL: Output file %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, out, Fore.RESET))
+			exit(-1)
+
+		with open(out) as f:
+			homedir = f.readline().strip()
+			homedirw = os.path.join(basedir, homedir.lstrip('/'))
+
+			if len(homedir) == 0 or not os.path.isdir(homedirw):
+				print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
+				exit(-1)
+
+			user2 = f.readline().strip()
+
+			if user2 != 'root':
+				print('%s[!]%s Failed to switch default user to %sroot%s.' % (Fore.RED, Fore.RESET, Fore.YELLOW, Fore.RESET))
+				exit(-1)
+
+		os.unlink(out)
+
+	except subprocess.CalledProcessError as err:
+		print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
+		exit(-1)
+
+	# since we switched to root, switch back to regular user on exit
+
+	def switch_user_back(user):
+		print('%s[*]%s Switching default user back to %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
+
+		try:
+			subprocess.check_output(['cmd', '/C', lxpath + '\\lxrun.exe', '/setdefaultuser', user])
+
+		except subprocess.CalledProcessError as err:
+			print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
+			exit(-1)
+
+	atexit.register(switch_user_back, user)
+
+# run post-install hooks, if any
+
+if havehooks:
 	hooks = ['all', image, image + '_' + tag]
 
 	for hook in hooks:

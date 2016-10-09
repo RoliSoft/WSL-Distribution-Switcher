@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # coding=utf-8
+import io
 import os
 import sys
 import glob
@@ -7,6 +8,7 @@ import glob
 # try to get colors, but don't make it a nuisance by requiring dependencies
 
 has_filter = False
+conemu = False
 
 if sys.platform == 'win32':
 	try:
@@ -261,24 +263,29 @@ def get_label(path):
 	return ''
 
 
-# stream copier with progress bar
+# toggle cursor visibility in the terminal
 
-def chunked_copy(name, source, dest):
+def show_cursor():
 	"""
-	Copes one stream into another, with progress bar.
-
-	:param name: Name of the file to display.
-	:param source: Source stream.
-	:param dest: Destination stream.
-
-	:return: Number of bytes copied.
+	Turns the cursor back on in the terminal.
 	"""
 
-	size = int(source.info()['Content-Length'].strip())
-	recv = 0
+	if not sys.platform == 'win32':
+		sys.stdout.write('\033[?25h')
 
-	if len(name) > 23:
-		name = name[0:20] + '...'
+	else:
+		ci = ConsoleCursorInfo()
+		handle = ctypes.windll.kernel32.GetStdHandle(-11)
+		ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(ci))
+		ci.visible = True
+		ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
+
+def hide_cursor():
+	"""
+	Turns the cursor off in the terminal.
+	"""
+
+	global conemu
 
 	if not sys.platform == 'win32':
 		sys.stdout.write('\033[?25l')
@@ -291,6 +298,29 @@ def chunked_copy(name, source, dest):
 		ci.visible = False
 		ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
 		conemu = os.environ.get('ConEmuANSI') == 'ON'
+
+# stream copier with progress bar
+
+def chunked_copy(name, source, dest):
+	"""
+	Copies one stream into another, with progress bar.
+
+	:param name: Name of the file to display.
+	:param source: Source stream.
+	:param dest: Destination stream.
+
+	:return: Number of bytes copied.
+	"""
+
+	global conemu
+
+	size = int(source.info()['Content-Length'].strip())
+	recv = 0
+
+	if len(name) > 23:
+		name = name[0:20] + '...'
+
+	hide_cursor()
 
 	while True:
 		chunk = source.read(8192)
@@ -316,14 +346,57 @@ def chunked_copy(name, source, dest):
 			if conemu:
 				sys.stdout.write('\033]9;4;0\033\\\033[39m')
 
-	if not sys.platform == 'win32':
-		sys.stdout.write('\033[?25h')
-
-	else:
-		ci = ConsoleCursorInfo()
-		handle = ctypes.windll.kernel32.GetStdHandle(-11)
-		ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(ci))
-		ci.visible = True
-		ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
+	show_cursor()
 
 	return recv
+
+
+# FileIO wrapper with progress bar
+
+class ProgressFileObject(io.FileIO):
+	def __init__(self, path, *args, **kwargs):
+		self._total_size = os.path.getsize(path)
+		self.current_extraction = ''
+		io.FileIO.__init__(self, path, *args, **kwargs)
+
+		hide_cursor()
+
+	def read(self, length):
+		"""
+		Read at most size bytes, returned as bytes.
+
+		Only makes one system call, so less data may be returned than requested.
+		In non-blocking mode, returns None if no data is available.
+		Return an empty bytes object at EOF.
+		"""
+
+		global conemu
+
+		recv = self.tell()
+		size = self._total_size
+		name = self.current_extraction
+
+		if len(name) > 23:
+			name = name[0:20] + '...'
+		else:
+			name = name.ljust(23, ' ')
+
+		pct = round(recv / size * 100, 2)
+		bar = int(50 * recv / size)
+		sys.stdout.write('\r    %s [%s>%s] %0.2f%%' % (name, '=' * bar, ' ' * (50 - bar), pct))
+
+		if conemu:
+			sys.stdout.write('\033]9;4;1;%0.0f\033\\\033[39m' % pct)
+
+		sys.stdout.flush()
+
+		if recv >= size:
+			sys.stdout.write('\r%s\r' % (' ' * (66 + len(name))))
+
+			if conemu:
+				sys.stdout.write('\033]9;4;0\033\\\033[39m')
+
+		return io.FileIO.read(self, length)
+
+	def __del__(self):
+		show_cursor()

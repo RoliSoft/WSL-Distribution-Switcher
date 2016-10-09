@@ -225,14 +225,20 @@ class ntfsea:
 	pstr   = lambda str: ctypes.c_char_p(str.encode('utf-8'))
 	pbytes = lambda str: ctypes.create_string_buffer(str, len(str))
 
-	def __init__(self):
+	@staticmethod
+	def init():
+		"""
+		Initializes the ntfsea library.
+		"""
+
 		if ntfsea.lib is None:
 			ntfsea.lib = ctypes.WinDLL('ntfsea_%s.dll' % ('x64' if platform.architecture()[0] == '64bit' else 'x86'))
 			ntfsea.lib.GetEaList.restype = ctypes.POINTER(ntfsea_EaList)
 			ntfsea.lib.GetEa.restype     = ctypes.POINTER(ntfsea_Ea)
 			ntfsea.lib.WriteEa.restype   = ctypes.c_int
 
-	def getattrlist(self, file):
+	@staticmethod
+	def getattrlist(file):
 		"""
 		Fetches the list of extended attributes available on the requested file.
 		:param file: Path to the file.
@@ -255,7 +261,8 @@ class ntfsea:
 		else:
 			return None
 
-	def getattr(self, file, name):
+	@staticmethod
+	def getattr(file, name):
 		"""
 		Fetches the specified extended attribute and its value from the requested file.
 		:param file: Path to the file.
@@ -273,7 +280,8 @@ class ntfsea:
 		else:
 			return None
 
-	def writeattr(self, file, name, value):
+	@staticmethod
+	def writeattr(file, name, value):
 		"""
 		Writes the specified extended attribute and its value to the requested file.
 		:param file: Path to the file.
