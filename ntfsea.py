@@ -252,7 +252,12 @@ class ntfsea:
 		"""
 
 		if ntfsea.lib is None:
-			ntfsea.lib = ctypes.WinDLL('ntfsea_%s.dll' % ('x64' if platform.architecture()[0] == '64bit' else 'x86'))
+			if hasattr(ctypes, 'WinDLL'):
+				loader = ctypes.WinDLL
+			else:
+				loader = ctypes.CDLL
+
+			ntfsea.lib = loader('ntfsea_%s.dll' % ('x64' if platform.architecture()[0] == '64bit' else 'x86'))
 			ntfsea.lib.GetEaList.restype = ctypes.POINTER(ntfsea_EaList)
 			ntfsea.lib.GetEa.restype     = ctypes.POINTER(ntfsea_Ea)
 			ntfsea.lib.WriteEa.restype   = ctypes.c_int
