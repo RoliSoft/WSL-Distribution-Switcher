@@ -331,20 +331,7 @@ def chunked_copy(name, source, dest):
 
 		dest.write(chunk)
 
-		pct = round(recv / size * 100, 2)
-		bar = int(50 * recv / size)
-		sys.stdout.write('\r    %s [%s>%s] %0.2f%%' % (name, '=' * bar, ' ' * (50 - bar), pct))
-
-		if conemu:
-			sys.stdout.write('\033]9;4;1;%0.0f\033\\\033[39m' % pct)
-
-		sys.stdout.flush()
-
-		if recv >= size:
-			sys.stdout.write('\r%s\r' % (' ' * (66 + len(name))))
-
-			if conemu:
-				sys.stdout.write('\033]9;4;0\033\\\033[39m')
+		draw_progress(recv, size, name)
 
 	show_cursor()
 
@@ -370,33 +357,46 @@ class ProgressFileObject(io.FileIO):
 		Return an empty bytes object at EOF.
 		"""
 
-		global conemu
-
-		recv = self.tell()
-		size = self._total_size
-		name = self.current_extraction
-
-		if len(name) > 23:
-			name = name[0:20] + '...'
-		else:
-			name = name.ljust(23, ' ')
-
-		pct = round(recv / size * 100, 2)
-		bar = int(50 * recv / size)
-		sys.stdout.write('\r    %s [%s>%s] %0.2f%%' % (name, '=' * bar, ' ' * (50 - bar), pct))
-
-		if conemu:
-			sys.stdout.write('\033]9;4;1;%0.0f\033\\\033[39m' % pct)
-
-		sys.stdout.flush()
-
-		if recv >= size:
-			sys.stdout.write('\r%s\r' % (' ' * (66 + len(name))))
-
-			if conemu:
-				sys.stdout.write('\033]9;4;0\033\\\033[39m')
+		draw_progress(self.tell(), self._total_size, self.current_extraction)
 
 		return io.FileIO.read(self, length)
 
 	def __del__(self):
 		show_cursor()
+
+
+# standalone function to draw an interactive progressbar
+
+def draw_progress(recv, size, name):
+	"""
+	Draws an interactive progressbar based on the specified information.
+
+	:param recv: Number of bytes received.
+	:param size: Total size of the file.
+	:param name: Name of the file to display.
+	"""
+
+	global conemu
+
+	if len(name) > 23:
+		name = name[0:20] + '...'
+	else:
+		name = name.ljust(23, ' ')
+
+	if recv > size:
+		recv = size
+
+	pct = round(recv / size * 100, 2)
+	bar = int(50 * recv / size)
+	sys.stdout.write('\r    %s [%s>%s] %0.2f%%' % (name, '=' * bar, ' ' * (50 - bar), pct))
+
+	if conemu:
+		sys.stdout.write('\033]9;4;1;%0.0f\033\\\033[39m' % pct)
+
+	sys.stdout.flush()
+
+	if recv == size:
+		sys.stdout.write('\r%s\r' % (' ' * (66 + len(name))))
+
+		if conemu:
+			sys.stdout.write('\033]9;4;0\033\\\033[39m')

@@ -203,6 +203,26 @@ class lxattrb:
 
 		return ret
 
+	@staticmethod
+	def fromsfs(sfs):
+		"""
+		Converts a SquashedFile instance to its equivalent Lxattrb instance.
+		:param sfs: SquashedFile instance.
+		:return: An instance of this class with the data members filled accordingly.
+		"""
+
+		ret = lxattrb()
+
+		ret.uid   = sfs.inode.uid
+		ret.gid   = sfs.inode.gid
+		ret.drive = 0
+		ret.atime = sfs.inode.time
+		ret.mtime = sfs.inode.time
+		ret.ctime = sfs.inode.time
+		ret.mode  = sfs.inode.mode
+
+		return ret
+
 
 # internal structures of the ntfsea.dll for ctypes
 

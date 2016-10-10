@@ -7,9 +7,15 @@ import shutil
 import tarfile
 import os.path
 import subprocess
-from utils import Fore, parse_image_arg, probe_wsl, get_label, ProgressFileObject, show_cursor
-from ntfsea import ntfsea, lxattrb
 
+from ntfsea import ntfsea, lxattrb
+from utils import Fore, ProgressFileObject, parse_image_arg, probe_wsl, get_label, show_cursor, hide_cursor, draw_progress
+
+try:
+	import PySquashfsImage
+	havesquashfs = True
+except ImportError:
+	havesquashfs = False
 
 # handle arguments
 
@@ -70,6 +76,14 @@ try:
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
+	exit(-1)
+
+# check squashfs prerequisites
+
+fext = os.path.splitext(fname)[-1].lower()
+
+if (fext == '.sfs' or fext == '.squashfs') and not havesquashfs:
+	print('%s[!]%s Module %sPySquashfsImage%s is not available. Install it with %spip3 install PySquashfsImage%s for SquashFS support.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
 	exit(-1)
 
 # get /etc/{passwd,shadow,group,gshadow} entries
@@ -145,53 +159,102 @@ if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
 
 print('%s[*]%s Beginning extraction...' % (Fore.GREEN, Fore.RESET))
 
-fileobj = ProgressFileObject(fname)
+if fext == '.sfs' or fext == '.squashfs':
 
-def iterfiles(files, path):
-	global fileobj
+	# extract rootfs from SquashFS
 
-	for file in files:
+	try:
+		img  = PySquashfsImage.SquashFsImage(fname)
+		path = os.path.join(homedirw, 'rootfs-temp')
 
-		# extract file
-
-		file.name = file.name.lstrip('./')
-		fileobj.current_extraction = file.name
-		file.name = path + '/' + file.name
-
-		if file.issym() or file.islnk():
-
-			# create symlink manually
-
-			with open(file.name, 'w') as link:
-				link.write(file.linkname)
-		else:
-
-			# send file for extraction
-
-			yield file
-
-		# apply lxattrb
-
-		try:
-			os.chmod(file.name, stat.S_IWRITE)
-		except WindowsError as err:
-			print('%s[!]%s Failed to extract %s: %s' % (Fore.YELLOW, Fore.RESET, fileobj.current_extraction, err))
-			pass
-
-		attrb = lxattrb.fromtar(file).generate()
-		ntfsea.writeattr(file.name, 'lxattrb', attrb)
-
-try:
-	with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = True, errorlevel = 2) as tar:
+		hide_cursor()
 		ntfsea.init()
-		tar.extractall(members = iterfiles(tar, os.path.join(homedirw, 'rootfs-temp')))
 
-except Exception as err:
-	print('%s[!]%s Failed to extract archive: %s' % (Fore.RED, Fore.RESET, err))
-	exit(-1)
+		i = 0
+		for file in img.root.findAll():
+			name = file.getPath().lstrip('./')
 
-finally:
-	show_cursor()
+			draw_progress(i, img.total_inodes, name)
+			i += 1
+
+			try:
+
+				# create directory or extract file
+
+				if file.isFolder():
+					os.makedirs(path + '/' + name, exist_ok = True)
+
+				else:
+					with open(path + '/' + name, 'wb') as f:
+						f.write(file.getContent())
+
+				# apply lxattrb
+
+				os.chmod(path + '/' + name, stat.S_IWRITE)
+
+				attrb = lxattrb.fromsfs(file).generate()
+				ntfsea.writeattr(path + '/' + name, 'lxattrb', attrb)
+
+			except Exception as err:
+				print('%s[!]%s Failed to extract %s: %s' % (Fore.YELLOW, Fore.RESET, name, err))
+				pass
+
+	finally:
+		img.close()
+		show_cursor()
+
+else:
+
+	# extract rootfs from tarball
+
+	fileobj = ProgressFileObject(fname)
+
+	def iterfiles(files, path):
+		global fileobj
+
+		for file in files:
+			try:
+
+				# extract file
+
+				file.name = file.name.lstrip('./')
+				fileobj.current_extraction = file.name
+				file.name = path + '/' + file.name
+
+				if file.issym() or file.islnk():
+
+					# create symlink manually
+
+					with open(file.name, 'w') as link:
+						link.write(file.linkname)
+				else:
+
+					# send file for extraction
+
+					yield file
+
+				# apply lxattrb
+
+				os.chmod(file.name, stat.S_IWRITE)
+
+				attrb = lxattrb.fromtar(file).generate()
+				ntfsea.writeattr(file.name, 'lxattrb', attrb)
+
+			except Exception as err:
+				print('%s[!]%s Failed to extract %s: %s' % (Fore.YELLOW, Fore.RESET, fileobj.current_extraction, err))
+				pass
+
+	try:
+		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = True, errorlevel = 2) as tar:
+			ntfsea.init()
+			tar.extractall(members = iterfiles(tar, os.path.join(homedirw, 'rootfs-temp')))
+
+	except Exception as err:
+		print('%s[!]%s Failed to extract archive: %s' % (Fore.RED, Fore.RESET, err))
+		exit(-1)
+
+	finally:
+		show_cursor()
 
 # read label of current distribution
 
