@@ -10,7 +10,7 @@ If you want to read about some of the challenges I faced while implementing the 
 
 The scripts provided here are written in Python 3, and they need to be run from Windows, __NOT__ from WSL. You can download a Python 3 installer from their [official website](https://www.python.org/downloads/), or you can use the one bundled with Cygwin. Since WSL is stored in `%LocalAppData%` for each user, you don't need admin rights in order to use any of the scripts.
 
-To begin, clone the repository or [download a copy](https://github.com/RoliSoft/WSL-Distribution-Switcher/archive/master.zip).
+To begin, clone the repository or [download a copy of it](https://github.com/RoliSoft/WSL-Distribution-Switcher/archive/master.zip).
 
 ### Obtaining tarballs
 
@@ -68,7 +68,7 @@ The `install.py` script is responsible for installing the tarballs as new rootfs
 
 The first argument of the script is either the _a)_ name of the file or the _b)_ same image:tag notation used in the `get.py` script: `install.py image[:tag] | tarball | squashfs`. You can install tarballs from sources other than the Docker Hub, however, they're not guaranteed to work.
 
-The specified file can be a `.tar*` archive, or a SquashFS image with `.sfs` or `.squashfs` extension. In order to process SquashFS images, the `unsquashfs` application needs to be installed inside WSL. You can do this with `apt-get install squashfs-tools` on the default distribution.
+The specified file can be a `.tar*` archive, or a SquashFS image with `.sfs` or `.squashfs` extension. In order to process SquashFS images, the `PySquashfsImage` Python module nees to be installed, which you can do with `pip3 install PySquashfsImage`.
 
 To install the freshly downloaded `rootfs_debian_sid.tar.xz` archive, run `install.py debian:sid` or `install.py rootfs_debian_sid.tar.xz`.
 
@@ -88,9 +88,11 @@ $ python install.py debian:sid
 [*] Switching default user back to RoliSoft...
 ```
 
-This operation extracts the tarball into your home directory from within WSL, then quits WSL and replaces the current rootfs with the new one.
+This operation extracts the tarball into your home directory in WSL, then replaces the current rootfs with the new one.
 
-Running `bash` should now launch the new distribution:
+Earlier version of this script spawned a new WSL shell, and ran the extraction command under the subsystem. For newer versions, the bundled `ntfsea` library provides functionality to write the NTFS extended attributes required for VoIFS, and as such, extraction now happens without the involvement of WSL. This means that broken rootfs installations can now be repaired to some extent, since the WSL does not have to be able to start beforehand.
+
+Running `bash` after installation should launch the new distribution:
 
 ```
 > bash
@@ -126,7 +128,9 @@ As noted above, the `REGULARUSER` environmental variable will be provided by `in
 
 If you would like your user to be added directly to `sudoers` with `NOPASSWD`, send `SUDONOPASSWD=1` as an environmental variable.
 
-Additionally, it accepts the `ROOTPASSWD` environmental variable, which should contain the password to set for the root account. If this is not specified, the root password will not be reset. On most distributions the root account has no password, i.e. it is locked.
+The `ROOTPASSWD` environmental variable should contain the password to set for the root account. If this is not specified, the root password will not be reset. On most distributions the root account has no password, i.e. it is locked.
+
+Additionally, the `WINVER` environmental variable allows for feature detection of the LXSS, so patches can be applied accordingly. E.g. `chroot` became available in 14936, so `fakeroot` workarounds are not required anymore.
 
 On Arch Linux, the AUR helper `pacaur` will be installed unless `WITHOUTPACAUR=1` is set as an environmental variable.
 
@@ -137,7 +141,7 @@ The script does the following:
 * Resets the root password, if asked.
 * Installs `sudo` and adds user to corresponding `sudo` group or directly to `sudoers`.
 * Fixes sudo hostname resolution warning.
-* Installs `pacaur`, patched `fakeroot` for `makepkg` and `chroot()` faker for `pacman` on Arch.
+* Installs `pacaur` and patched `fakeroot` for `makepkg` on Arch, and if WSL build is older than 14936, `chroot()` faker for `pacman`.
 * Installs basic dependencies required to install new distributions.
 * Installs git, vim, tmux.
 
@@ -204,7 +208,9 @@ As mentioned before, switching is just 2 directory rename operations. However, W
 
 * ~~Implement hooks, so patches can be applied to fix WSL issues on a per-image basis, or just user-specific ones, such as preinstalling a few packages.~~ Done, see section "Post-install hook scripts".
 
-* Figure out if it's possible to attach the Linux-specific metadata from outside of WSL, so then tarballs can be extracted and processed without invoking WSL.
+* ~~Figure out if it's possible to attach the Linux-specific metadata from outside of WSL, so then tarballs can be extracted and processed without invoking WSL.~~ Done, installation now happens without spawning WSL for extraction. If you wish to use this in your own project, see `ntfsea.[c|py]`.
+
+Looks like all the challenges I listed here initially have been solved. Feel free to open a new ticket if you have any suggestions on how the project could be enhanced.
 
 ## Troubleshooting
 
@@ -234,7 +240,7 @@ alias sudo="sudo -S"
 
 * __`pacman` fails with `could not change the root directory (Function not implemented)`__
 
-This happens because WSL does not support `chroot()` at this time. A workaround for this issue, albeit not a clean solution, is to mock the `chroot()` function.
+This happens because WSL did not support `chroot()` before build 14936, and you are running one of them. A workaround for this issue, albeit not a clean solution, is to mock the `chroot()` function.
 
 To compile a library with a no-op `chroot()`, run:
 
@@ -249,15 +255,9 @@ You can then inject this via `LD_PRELOAD`, during each command execution:
 LD_PRELOAD=libmockchroot.so pacman ...
 ```
 
-If you installed Arch Linux with the provided global hook script, such a library was already written to `/lib64/libmockchroot.so` and added to `/etc/ld.so.preload`, so you will not need to compile it manually or specify it everytime with `LD_PRELOAD`.
+If you installed Arch Linux with the provided global hook script and your WSL was detected not to have `chroot` support, a library was already written to `/lib64/libmockchroot.so` and added to `/etc/ld.so.preload`, so you will not need to compile it manually or specify it everytime with `LD_PRELOAD`.
 
-This preinstalled version only affects `pacman`. You can view its source and compilation instructions in the [libmockchroot.so](https://gist.github.com/RoliSoft/84813cc353caec614dee8bf74c1b09ef) gist.
-
-* __`pacaur`/`makepkg` prints `dlsym(acl\_get\_fd): ...: undefined symbol: acl\_get\_fd`__
-
-These lines are printed by `fakeroot-tcp`, and they are just warnings about some non-existant functions under WSL, which fakeroot then fails to mock.
-
-You should be fine, as long as those functions are not used by the command and are not critical to its execution.
+You can view its source and compilation instructions in the [libmockchroot.so](https://gist.github.com/RoliSoft/84813cc353caec614dee8bf74c1b09ef) gist.
 
 * __get-source.py returns "Failed to find a suitable rootfs specification in Dockerfile."__
 
@@ -267,15 +267,11 @@ The `Dockerfile` has no `ADD archive.tar /` directive. All suitable Linux distri
 
 * __install.py returns an error after "Beginning extraction..."__
 
-This depends on the error, which should be printed on the console. The Python script has no access to the error message due to `stdout`/`stderr` redirection limits within WSL. (See [issue #2](https://github.com/Microsoft/BashOnWindows/issues/2).)
+Earlier versions of the script invoked WSL for the extraction part, and this proved quite problematic in scenarios where some depedencies were missing in the distribution, it was behaving in a non-standard way, or the current WSL was broken to begin with.
 
-Generally, you should switch back to the default installation (`switch.py ubuntu:trusty`) and try again, since the extraction part has to be done from within WSL due to Linux-specific metadata being attached to the files.
+Current versions of the script extract the archives from Windows and write the necessary NTFS extended attributes for WSL at the same time. This is less errorprone, and does not require a working rootfs to be present.
 
-In case of not found errors, make sure you have all dependencies installed from within WSL: `sudo apt-get install tar gzip bzip2 xz-utils squashfs-tools`
-
-In case of permission errors, make sure you have write access to your root directory at `/root` and `/tmp`. Also make sure you have no leftover `rootfs-temp` directory in your home. While the script removes such leftover artifacts, if these files were touched from outside of WSL, it's possible it can't remove it.
-
-Also, I've noticed, if you create a directory or file outside of WSL, you will __not__ see it from within WSL, and if you try to write to a file with the same name, you'll just get a generic I/O error. In this case, open `%LocalAppData%\lxss` from Windows Explorer, and check if `root/rootfs-temp` exists.
+In case you get errors with the newer versions, open `%LocalAppData%\lxss` from Windows Explorer and try checking if you have permission to write into the `/root` or `/home/username` directories. Also check if there are any leftover `rootfs-temp` directories in them, if so, make sure to delete them.
 
 ## Screenshots
 
