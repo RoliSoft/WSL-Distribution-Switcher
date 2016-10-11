@@ -455,7 +455,7 @@ if havehooks:
 				continue
 
 			try:
-				subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'REGULARUSER="%s" /root/%s' % (user if not isroot else '', hookfile)])
+				subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'REGULARUSER="%s" WINVER="%d" /root/%s' % (user if not isroot else '', sys.getwindowsversion().build, hookfile)])
 
 			except subprocess.CalledProcessError as err:
 				print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
