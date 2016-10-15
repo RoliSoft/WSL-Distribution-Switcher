@@ -227,6 +227,9 @@ else:
 
 					with open(file.name, 'w') as link:
 						link.write(file.linkname)
+				elif file.ischr() or file.isblk():
+					# skip device files, such as /dev/*
+					continue
 				else:
 
 					# send file for extraction
@@ -245,7 +248,7 @@ else:
 				pass
 
 	try:
-		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = True, errorlevel = 2) as tar:
+		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = False, errorlevel = 2) as tar:
 			ntfsea.init()
 			tar.extractall(members = iterfiles(tar, os.path.join(homedirw, 'rootfs-temp')))
 
