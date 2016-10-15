@@ -248,7 +248,7 @@ else:
 				pass
 
 	try:
-		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = True, errorlevel = 2) as tar:
+		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = False, errorlevel = 2) as tar:
 			ntfsea.init()
 			tar.extractall(members = iterfiles(tar, os.path.join(homedirw, 'rootfs-temp')))
 
