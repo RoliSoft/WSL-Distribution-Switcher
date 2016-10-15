@@ -203,6 +203,7 @@ if fext == '.sfs' or fext == '.squashfs':
 
 	finally:
 		img.close()
+		clear_progress()
 		show_cursor()
 
 else:
@@ -211,49 +212,58 @@ else:
 
 	fileobj = ProgressFileObject(fname)
 
-	def iterfiles(files, path):
-		global fileobj
-
-		for file in files:
-			try:
-
-				# extract file
-
-				file.name = file.name.lstrip('./')
-				fileobj.current_extraction = file.name
-				file.name = path + '/' + file.name
-
-				if file.issym() or file.islnk():
-
-					# create symlink manually
-
-					with open(file.name, 'w') as link:
-						link.write(file.linkname)
-				elif file.ischr() or file.isblk():
-					# skip device files, such as /dev/*
-					continue
-				else:
-
-					# send file for extraction
-
-					yield file
-
-				# apply lxattrb
-
-				os.chmod(file.name, stat.S_IWRITE)
-
-				attrb = lxattrb.fromtar(file).generate()
-				ntfsea.writeattr(file.name, 'lxattrb', attrb)
-
-			except Exception as err:
-				clear_progress()
-				print('%s[!]%s Failed to extract %s: %s' % (Fore.YELLOW, Fore.RESET, fileobj.current_extraction, err))
-				pass
-
 	try:
+		ntfsea.init()
+		path = os.path.join(homedirw, 'rootfs-temp')
+
 		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = False, errorlevel = 2) as tar:
-			ntfsea.init()
-			tar.extractall(members = iterfiles(tar, os.path.join(homedirw, 'rootfs-temp')))
+
+			file = tar.next()
+
+			while file is not None:
+				try:
+
+					# extract file
+
+					file.name = file.name.lstrip('./')
+					fileobj.current_extraction = file.name
+					file.name = path + '/' + file.name
+
+					if file.issym() or file.islnk():
+
+						# create symlink manually
+
+						with open(file.name, 'w') as link:
+							link.write(file.linkname)
+
+					elif file.isdev():
+
+						# skip device files, such as /dev/*
+						continue
+
+					else:
+
+						# extract file
+						tar.extract(file, path)
+
+					# apply lxattrb
+
+					os.chmod(file.name, stat.S_IWRITE)
+
+					attrb = lxattrb.fromtar(file).generate()
+					ntfsea.writeattr(file.name, 'lxattrb', attrb)
+
+				except struct.error:
+					# skip 'required argument is not an integer' errors on some prebuilt images
+					pass
+
+				except Exception as err:
+					clear_progress()
+					print('%s[!]%s Failed to extract %s: %s' % (Fore.YELLOW, Fore.RESET, fileobj.current_extraction, err))
+					pass
+
+				finally:
+					file = tar.next()
 
 	except Exception as err:
 		clear_progress()
@@ -261,6 +271,7 @@ else:
 		exit(-1)
 
 	finally:
+		clear_progress()
 		show_cursor()
 
 # read label of current distribution
