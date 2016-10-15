@@ -4,11 +4,13 @@ import io
 import os
 import sys
 import glob
+import time
 
 # try to get colors, but don't make it a nuisance by requiring dependencies
 
 has_filter = False
 has_progress = False
+last_progress = 0
 conemu = False
 
 if sys.platform == 'win32':
@@ -377,7 +379,7 @@ def draw_progress(recv, size, name):
 	:param name: Name of the file to display.
 	"""
 
-	global conemu, has_progress
+	global conemu, has_progress, last_progress
 
 	if recv > size:
 		recv = size
@@ -386,7 +388,11 @@ def draw_progress(recv, size, name):
 		clear_progress()
 		return
 
-	has_progress = True
+	if time.time() - last_progress < 0.05:
+		return
+
+	has_progress  = True
+	last_progress = time.time()
 
 	if len(name) > 23:
 		name = name[0:20] + '...'
