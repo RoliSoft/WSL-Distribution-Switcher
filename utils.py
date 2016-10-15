@@ -8,6 +8,7 @@ import glob
 # try to get colors, but don't make it a nuisance by requiring dependencies
 
 has_filter = False
+has_progress = False
 conemu = False
 
 if sys.platform == 'win32':
@@ -376,15 +377,21 @@ def draw_progress(recv, size, name):
 	:param name: Name of the file to display.
 	"""
 
-	global conemu
+	global conemu, has_progress
+
+	if recv > size:
+		recv = size
+
+	if recv == size:
+		clear_progress()
+		return
+
+	has_progress = True
 
 	if len(name) > 23:
 		name = name[0:20] + '...'
 	else:
 		name = name.ljust(23, ' ')
-
-	if recv > size:
-		recv = size
 
 	pct = round(recv / size * 100, 2)
 	bar = int(50 * recv / size)
@@ -395,8 +402,22 @@ def draw_progress(recv, size, name):
 
 	sys.stdout.flush()
 
-	if recv == size:
-		sys.stdout.write('\r%s\r' % (' ' * (66 + len(name))))
 
-		if conemu:
-			sys.stdout.write('\033]9;4;0\033\\\033[39m')
+def clear_progress():
+	"""
+	Clears the progress bar.
+	"""
+
+	global conemu, has_progress
+
+	if not has_progress:
+		return
+
+	has_progress = False
+
+	sys.stdout.write('\r%s\r' % (' ' * (66 + 23)))
+
+	if conemu:
+		sys.stdout.write('\033]9;4;0\033\\\033[39m')
+
+	sys.stdout.flush()

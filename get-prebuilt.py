@@ -3,7 +3,7 @@
 import sys
 import json
 import urllib.request
-from utils import Fore, parse_image_arg, chunked_copy
+from utils import Fore, parse_image_arg, chunked_copy, clear_progress
 
 # handle arguments
 
@@ -77,10 +77,12 @@ for layer in manifest['fsLayers']:
 			chunked_copy(fname, u, f)
 
 	except urllib.error.HTTPError as err:
+		clear_progress()
 		print('%s[!]%s Failed to download layer %s%s%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, layer['blobSum'], Fore.RESET, err))
 		exit(-1)
 
 	except OSError as err:
+		clear_progress()
 		print('%s[!]%s Failed to open file %s%s%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET, err))
 		exit(-1)
 

@@ -4,12 +4,13 @@ import sys
 import stat
 import atexit
 import shutil
+import struct
 import tarfile
 import os.path
 import subprocess
 
 from ntfsea import ntfsea, lxattrb
-from utils import Fore, ProgressFileObject, parse_image_arg, probe_wsl, get_label, show_cursor, hide_cursor, draw_progress
+from utils import Fore, ProgressFileObject, parse_image_arg, probe_wsl, get_label, show_cursor, hide_cursor, draw_progress, clear_progress
 
 try:
 	import PySquashfsImage
@@ -196,6 +197,7 @@ if fext == '.sfs' or fext == '.squashfs':
 				ntfsea.writeattr(path + '/' + name, 'lxattrb', attrb)
 
 			except Exception as err:
+				clear_progress()
 				print('%s[!]%s Failed to extract %s: %s' % (Fore.YELLOW, Fore.RESET, name, err))
 				pass
 
@@ -244,6 +246,7 @@ else:
 				ntfsea.writeattr(file.name, 'lxattrb', attrb)
 
 			except Exception as err:
+				clear_progress()
 				print('%s[!]%s Failed to extract %s: %s' % (Fore.YELLOW, Fore.RESET, fileobj.current_extraction, err))
 				pass
 
@@ -253,6 +256,7 @@ else:
 			tar.extractall(members = iterfiles(tar, os.path.join(homedirw, 'rootfs-temp')))
 
 	except Exception as err:
+		clear_progress()
 		print('%s[!]%s Failed to extract archive: %s' % (Fore.RED, Fore.RESET, err))
 		exit(-1)
 
