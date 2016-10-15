@@ -227,6 +227,9 @@ else:
 
 					with open(file.name, 'w') as link:
 						link.write(file.linkname)
+				elif file.ischr() or file.isblk():
+					# skip device files, such as /dev/*
+					continue
 				else:
 
 					# send file for extraction
