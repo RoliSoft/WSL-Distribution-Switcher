@@ -381,7 +381,7 @@ def draw_progress(recv, size, name):
 	if len(name) > 23:
 		name = name[0:20] + '...'
 	else:
-		name = name.ljust(23, ' ')
+		name = name.ljust(23, ' ')
 
 	if recv > size:
 		recv = size
