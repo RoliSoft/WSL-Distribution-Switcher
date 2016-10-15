@@ -9,7 +9,7 @@ import tarfile
 import os.path
 import subprocess
 
-from ntfsea import ntfsea, lxattrb
+from ntfsea import ntfsea, lxattrb, stmode
 from utils import Fore, ProgressFileObject, parse_image_arg, probe_wsl, get_label, show_cursor, hide_cursor, draw_progress, clear_progress
 
 try:
@@ -264,6 +264,29 @@ else:
 
 				finally:
 					file = tar.next()
+
+		# some archives don't seem to have the directories themselves as separate
+		# entries, and this results in lxattrb not being applied to them, which will
+		# lead to bash.exe returning Error: 0x80070002 or 0x8007001f
+
+		dattrb = lxattrb(stmode.FDIR | 0o755).generate()
+		fattrb = lxattrb(stmode.FREG | 0o755).generate()
+
+		for root, subFolders, files in os.walk(path):
+
+			# apply generic root:root 0755 to those without an attribute
+
+			for folder in subFolders:
+				folder = os.path.join(root, folder)
+
+				if ntfsea.getattr(folder, 'lxattrb') is None:
+					ntfsea.writeattr(folder, 'lxattrb', dattrb)
+
+			for file in files:
+				file = os.path.join(root, file)
+
+				if ntfsea.getattr(file, 'lxattrb') is None:
+					ntfsea.writeattr(file, 'lxattrb', fattrb)
 
 	except Exception as err:
 		clear_progress()

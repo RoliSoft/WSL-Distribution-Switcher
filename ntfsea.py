@@ -137,7 +137,7 @@ class lxattrb:
 	def __init__(self, mode = 0, uid = 0, gid = 0, drive = 0, atime = 0, mtime = 0, ctime = 0):
 		self.flags   = 0
 		self.version = 1
-		self.mode    = mode  # 33206
+		self.mode    = mode
 		self.uid     = uid
 		self.gid     = gid
 		self.drive   = drive
