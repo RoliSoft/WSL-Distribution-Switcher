@@ -179,9 +179,9 @@ class lxattrb:
 		ret.gid   = tar.gid
 		ret.drive = 0
 		# float 2 int
-		ret.atime = int(tar.mtime)
+		ret.atime = int(getattr(tar.pax_headers, "atime", tar.mtime))
 		ret.mtime = int(tar.mtime)
-		ret.ctime = int(tar.mtime)
+		ret.ctime = int(getattr(tar.pax_headers, "ctime", tar.mtime))
 
 		# set file type
 
