@@ -9,6 +9,7 @@ import tarfile
 import os.path
 import subprocess
 
+from collections import OrderedDict
 from ntfsea import ntfsea, lxattrb, stmode
 from utils import Fore, ProgressFileObject, parse_image_arg, probe_wsl, get_label, show_cursor, hide_cursor, draw_progress, clear_progress, escape_ntfs_invalid
 
@@ -222,17 +223,41 @@ if fext == '.sfs' or fext == '.squashfs':
 
 else:
 
+	# the TarFile class has a list of supported compression methods, but this is stored
+	# in a dictionary, which somehow becomes randomized during each run. since the 'tar'
+	# option accepts anything, if during randomization it gets in front of the actual
+	# compression method the archive is using, the archive won't be opened properly anymore.
+	#
+	# this resulted in a very annoying heisenbug during the installation when ignore_zeros was
+	# set to True. thanks to @yyjdelete for tracking it down: https://bugs.python.org/issue28449
+	#
+	# since ignore_zeros is pretty useful due to the use of multiple layers in the prebuilt images,
+	# the workaround here is to monkeypatch the TarFile.OPEN_METH dictionary and replace it with
+	# a dictionary whose order is preserved.
+
+	tarfile.TarFile.OPEN_METH = OrderedDict()
+	tarfile.TarFile.OPEN_METH['gz']  = 'gzopen'
+	tarfile.TarFile.OPEN_METH['bz2'] = 'bz2open'
+	tarfile.TarFile.OPEN_METH['xz']  = 'xzopen'
+	tarfile.TarFile.OPEN_METH['tar'] = 'taropen'
+
 	# extract rootfs from tarball
 
 	fileobj = ProgressFileObject(fname)
+	fileobj.current_extraction = 'Scanning archive...'
 
 	try:
 		ntfsea.init()
 		path = os.path.join(homedirw, 'rootfs-temp')
 
-		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = False, errorlevel = 2) as tar:
+		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = True, errorlevel = 2) as tar:
 
 			file = tar.next()
+
+			if file is None:
+				clear_progress()
+				print('%s[!]%s Failed to extract archive: unable to determine archive type.' % (Fore.RED, Fore.RESET))
+				exit(-1)
 
 			while file is not None:
 				try:
