@@ -154,7 +154,19 @@ if etcshadowroot:
 if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
 	print('%s[*]%s Removing leftover %srootfs-temp%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
 
-	shutil.rmtree(os.path.join(homedirw, 'rootfs-temp'), True)
+	try:
+		def retry_rw(operation, name, exc):
+			os.chmod(name, stat.S_IWRITE)
+			operation(name)
+
+		shutil.rmtree(os.path.join(homedirw, 'rootfs-temp'), onerror = retry_rw)
+	except Exception:
+		pass
+
+	# ensure it's removed
+	if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
+		print('%s[*]%s Failed to remove leftover %srootfs-temp%s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
+		exit(-1)
 
 # extract archive
 
