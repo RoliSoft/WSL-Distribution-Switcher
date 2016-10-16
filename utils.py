@@ -283,6 +283,7 @@ def show_cursor():
 		ci.visible = True
 		ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
 
+
 def hide_cursor():
 	"""
 	Turns the cursor off in the terminal.
@@ -301,6 +302,23 @@ def hide_cursor():
 		ci.visible = False
 		ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
 		conemu = os.environ.get('ConEmuANSI') == 'ON'
+
+
+# some characters are forbidden in NTFS, but are not in ext4. the most popular of these characters
+# seems to be the colon character. LXSS solves this issue by escaping the character on NTFS.
+# while this seems like a dumb implementation, it will be called a lot of times inside the
+# decompression loop, so it has to be fast: http://stackoverflow.com/a/27086669/156626
+
+def escape_ntfs_invalid(name):
+	"""
+	Escapes characters which are forbidden in NTFS, but are not in ext4.
+
+	:param name: Path potentially containing forbidden NTFS characters.
+
+	:return: Path with forbidden NTFS characters escaped.
+	"""
+	return name.replace('*', '#002A').replace('|', '#007C').replace(':', '#003A').replace('>', '#003E').replace('<', '#003C').replace('?', '#003F').replace('"', '#0022')
+
 
 # stream copier with progress bar
 

@@ -10,7 +10,7 @@ import os.path
 import subprocess
 
 from ntfsea import ntfsea, lxattrb, stmode
-from utils import Fore, ProgressFileObject, parse_image_arg, probe_wsl, get_label, show_cursor, hide_cursor, draw_progress, clear_progress
+from utils import Fore, ProgressFileObject, parse_image_arg, probe_wsl, get_label, show_cursor, hide_cursor, draw_progress, clear_progress, escape_ntfs_invalid
 
 try:
 	import PySquashfsImage
@@ -187,6 +187,7 @@ if fext == '.sfs' or fext == '.squashfs':
 		i = 0
 		for file in img.root.findAll():
 			name = file.getPath().lstrip('./')
+			winpath = path + '/' + escape_ntfs_invalid(name)
 
 			draw_progress(i, img.total_inodes, name)
 			i += 1
@@ -196,18 +197,18 @@ if fext == '.sfs' or fext == '.squashfs':
 				# create directory or extract file
 
 				if file.isFolder():
-					os.makedirs(path + '/' + name, exist_ok = True)
+					os.makedirs(winpath, exist_ok = True)
 
 				else:
-					with open(path + '/' + name, 'wb') as f:
+					with open(winpath, 'wb') as f:
 						f.write(file.getContent())
 
 				# apply lxattrb
 
-				os.chmod(path + '/' + name, stat.S_IWRITE)
+				os.chmod(winpath, stat.S_IWRITE)
 
 				attrb = lxattrb.fromsfs(file).generate()
-				ntfsea.writeattr(path + '/' + name, 'lxattrb', attrb)
+				ntfsea.writeattr(winpath, 'lxattrb', attrb)
 
 			except Exception as err:
 				clear_progress()
@@ -240,7 +241,7 @@ else:
 
 					file.name = file.name.lstrip('./')
 					fileobj.current_extraction = file.name
-					file.name = path + '/' + file.name
+					file.name = path + '/' + escape_ntfs_invalid(file.name)
 
 					if file.issym() or file.islnk():
 
