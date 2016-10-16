@@ -98,7 +98,7 @@ elif [[ "${PAC}" == 1 ]]; then
 
 	${mgr} -Su
 	pacman-db-upgrade
-	${mgr} -S ca-certificates-mozilla
+	${mgr} -S ca-certificates-mozilla gawk
 fi
 
 # fix locale warnings
