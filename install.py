@@ -164,8 +164,9 @@ if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
 		pass
 
 	# ensure it's removed
+
 	if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
-		print('%s[*]%s Failed to remove leftover %srootfs-temp%s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
+		print('%s[*]%s Failed to remove leftover %srootfs-temp%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
 		exit(-1)
 
 # extract archive
@@ -245,7 +246,7 @@ else:
 
 						# create symlink manually
 
-						with open(file.name, 'w') as link:
+						with open(file.name, 'w', encoding='utf-8') as link:
 							link.write(file.linkname)
 
 					elif file.isdev():
