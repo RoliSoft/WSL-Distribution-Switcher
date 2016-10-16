@@ -2,6 +2,7 @@
 # coding=utf-8
 import sys
 import stat
+import time
 import atexit
 import shutil
 import struct
@@ -272,6 +273,10 @@ else:
 
 						# create symlink manually
 
+						dirname = os.path.dirname(file.name)
+						if not os.path.exists(dirname):
+							os.makedirs(dirname, exist_ok=True)
+
 						with open(file.name, 'w', encoding='utf-8') as link:
 							link.write(file.linkname)
 
@@ -352,6 +357,8 @@ except subprocess.CalledProcessError as err:
 	exit(-1)
 
 print('%s[*]%s Switching to new %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
+
+time.sleep(1)
 
 try:
 	subprocess.check_output(['cmd', '/C', 'move', os.path.join(homedirw, 'rootfs-temp'), os.path.join(basedir, 'rootfs')])
