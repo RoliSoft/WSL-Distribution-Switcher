@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # coding=utf-8
+import os
 import sys
 import json
 import urllib.request
@@ -60,6 +61,10 @@ except urllib.error.HTTPError as err:
 
 dled   = set()
 fname += '.tar.gz'
+
+# remove old file before download
+if os.path.exists(fname):
+	os.remove(fname)
 
 for layer in manifest['fsLayers']:
 	if layer['blobSum'] in dled:
