@@ -178,9 +178,10 @@ class lxattrb:
 		ret.uid   = tar.uid
 		ret.gid   = tar.gid
 		ret.drive = 0
-		ret.atime = tar.mtime
-		ret.mtime = tar.mtime
-		ret.ctime = tar.mtime
+		# float 2 int
+		ret.atime = int(tar.mtime)
+		ret.mtime = int(tar.mtime)
+		ret.ctime = int(tar.mtime)
 
 		# set file type
 

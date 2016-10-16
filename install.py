@@ -253,10 +253,6 @@ else:
 					attrb = lxattrb.fromtar(file).generate()
 					ntfsea.writeattr(file.name, 'lxattrb', attrb)
 
-				except struct.error:
-					# skip 'required argument is not an integer' errors on some prebuilt images
-					pass
-
 				except Exception as err:
 					clear_progress()
 					print('%s[!]%s Failed to extract %s: %s' % (Fore.YELLOW, Fore.RESET, fileobj.current_extraction, err))
