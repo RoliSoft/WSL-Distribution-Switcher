@@ -3,3 +3,6 @@ hook_*.sh
 *.tar.*
 .idea
 __pycache__/
+build/
+dist/
+upx.exe

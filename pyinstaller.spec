@@ -4,6 +4,7 @@
 #	Run with: pyinstaller --noconfirm --clean pyinstaller.spec
 #
 
+import platform
 from os import system
 
 files = ['get-source', 'get-prebuilt', 'install', 'switch']
@@ -12,12 +13,12 @@ for file in files:
 	binaries = None
 
 	if file == 'install':
-		binaries = [('ntfsea_x86.dll', '.'),('ntfsea_x64.dll', '.')]
+		binaries = [('ntfsea_%s.dll' % ('x64' if platform.architecture()[0] == '64bit' else 'x86'), '.')]
 
 	a = Analysis([file + '.py'], pathex=['.'], binaries=binaries, datas=None, hiddenimports=[], hookspath=[], runtime_hooks=[], excludes=[], win_no_prefer_redirects=False, win_private_assemblies=False, cipher=None)
 	pyz = PYZ(a.pure, a.zipped_data, cipher=None)
-	exe = EXE(pyz, a.scripts, exclude_binaries=True, name=file, debug=False, strip=False, upx=True, icon=None, console=True)
-	col = COLLECT(exe, a.binaries, a.zipfiles, a.datas, strip=False, upx=True, icon=None, name=file)
+	exe = EXE(pyz, a.scripts, exclude_binaries=True, name=file, debug=False, strip=False, upx=False, icon=None, console=True)
+	col = COLLECT(exe, a.binaries, a.zipfiles, a.datas, strip=False, upx=False, icon=None, name=file)
 
 for file in files:
 	if file == 'switch':
