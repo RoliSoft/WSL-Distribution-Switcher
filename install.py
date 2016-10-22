@@ -35,7 +35,7 @@ if len(sys.argv) > 1:
 if not imgarg:
 	print('usage: ./install.py [--no-hooks] image[:tag] | tarball | squashfs')
 	print('\noptions:\n  --no-hooks    Omits running the hook scripts.')
-	exit(-1)
+	sys.exit(-1)
 
 image, tag, fname, label = parse_image_arg(imgarg, True)
 
@@ -60,7 +60,7 @@ try:
 
 	if not os.path.isfile(out):
 		print('%s[!]%s Failed to get home directory of default user in WSL: Output file %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, out, Fore.RESET))
-		exit(-1)
+		sys.exit(-1)
 
 	with open(out) as f:
 		homedir  = f.readline().strip()
@@ -68,7 +68,7 @@ try:
 
 		if len(homedir) == 0 or not os.path.isdir(homedirw):
 			print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
-			exit(-1)
+			sys.exit(-1)
 
 		user   = f.readline().strip()
 		isroot = user == 'root'
@@ -79,7 +79,7 @@ try:
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 # check squashfs prerequisites
 
@@ -87,7 +87,7 @@ fext = os.path.splitext(fname)[-1].lower()
 
 if (fext == '.sfs' or fext == '.squashfs') and not havesquashfs:
 	print('%s[!]%s Module %sPySquashfsImage%s is not available. Install it with %spip3 install PySquashfsImage%s for SquashFS support.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
-	exit(-1)
+	sys.exit(-1)
 
 # get /etc/{passwd,shadow,group,gshadow} entries
 
@@ -108,7 +108,7 @@ if not isroot:
 
 	except OSError as err:
 		print('%s[!]%s Failed to open file %s/etc/passwd%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-		exit(-1)
+		sys.exit(-1)
 
 try:
 	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), newline='\n') as f:
@@ -120,7 +120,7 @@ try:
 
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/etc/shadow%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 if not isroot:
 	try:
@@ -131,7 +131,7 @@ if not isroot:
 
 	except OSError as err:
 		print('%s[!]%s Failed to open file %s/etc/group%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-		exit(-1)
+		sys.exit(-1)
 
 	try:
 		with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow'), newline='\n') as f:
@@ -141,7 +141,7 @@ if not isroot:
 
 	except OSError as err:
 		print('%s[!]%s Failed to open file %s/etc/gshadow%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-		exit(-1)
+		sys.exit(-1)
 
 if etcshadowroot:
 	parts = etcshadowroot.split(':')
@@ -169,7 +169,7 @@ if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
 
 	if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
 		print('%s[*]%s Failed to remove leftover %srootfs-temp%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
-		exit(-1)
+		sys.exit(-1)
 
 # extract archive
 
@@ -258,7 +258,7 @@ else:
 			if file is None:
 				clear_progress()
 				print('%s[!]%s Failed to extract archive: unable to determine archive type.' % (Fore.RED, Fore.RESET))
-				exit(-1)
+				sys.exit(-1)
 
 			while file is not None:
 				try:
@@ -331,7 +331,7 @@ else:
 	except Exception as err:
 		clear_progress()
 		print('%s[!]%s Failed to extract archive: %s' % (Fore.RED, Fore.RESET, err))
-		exit(-1)
+		sys.exit(-1)
 
 	finally:
 		clear_progress()
@@ -354,7 +354,7 @@ try:
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 print('%s[*]%s Switching to new %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
 
@@ -374,7 +374,7 @@ except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 		print('%s[!]%s You are now the proud owner of one broken Linux subsystem! To fix it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
 
-	exit(-1)
+	sys.exit(-1)
 
 # save label
 
@@ -460,7 +460,7 @@ if not isroot and havehooks:
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
-		exit(-1)
+		sys.exit(-1)
 
 	try:
 		subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c',
@@ -469,7 +469,7 @@ if not isroot and havehooks:
 
 		if not os.path.isfile(out):
 			print('%s[!]%s Failed to get home directory of default user in WSL: Output file %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, out, Fore.RESET))
-			exit(-1)
+			sys.exit(-1)
 
 		with open(out) as f:
 			homedir = f.readline().strip()
@@ -477,19 +477,19 @@ if not isroot and havehooks:
 
 			if len(homedir) == 0 or not os.path.isdir(homedirw):
 				print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
-				exit(-1)
+				sys.exit(-1)
 
 			user2 = f.readline().strip()
 
 			if user2 != 'root':
 				print('%s[!]%s Failed to switch default user to %sroot%s.' % (Fore.RED, Fore.RESET, Fore.YELLOW, Fore.RESET))
-				exit(-1)
+				sys.exit(-1)
 
 		os.unlink(out)
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
-		exit(-1)
+		sys.exit(-1)
 
 	# since we switched to root, switch back to regular user on exit
 
@@ -501,7 +501,7 @@ if not isroot and havehooks:
 
 		except subprocess.CalledProcessError as err:
 			print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
-			exit(-1)
+			sys.exit(-1)
 
 	atexit.register(switch_user_back, user)
 

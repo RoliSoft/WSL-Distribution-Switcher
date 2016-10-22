@@ -51,7 +51,7 @@ if len(sys.argv) < 2:
 			else:
 				print('You do not seem to have the default distribution installed anymore.\nTo reinstall it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
 
-	exit(-1)
+	sys.exit(-1)
 
 image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 
@@ -71,7 +71,7 @@ if not clabel:
 	if label == clabel:
 		print('%s[!]%s No %s/.switch_label%s found, and the target rootfs is %subuntu%s:%strusty%s. Cannot continue.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
 		print('%s[!]%s To fix this, run %secho some_tag > /.switch_label%s (replacing %ssome_tag%s with something like %sdebian_sid%s) from the current Bash terminal.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
-		exit(-1)
+		sys.exit(-1)
 	else:
 		print('%s[!]%s No %s/.switch_label%s found, assuming current rootfs is %subuntu%s:%strusty%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
 
@@ -79,11 +79,11 @@ if not clabel:
 
 if clabel == label:
 	print('%s[!]%s The %s%s%s:%s%s%s rootfs is the current installation.' % (Fore.YELLOW, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET))
-	exit(-1)
+	sys.exit(-1)
 
 if not os.path.isdir(os.path.join(basedir, 'rootfs_' + label)):
 	print('%s[!]%s The %s%s%s:%s%s%s rootfs is not installed.' % (Fore.RED, Fore.RESET, Fore.YELLOW, image, Fore.RESET, Fore.YELLOW, tag, Fore.RESET))
-	exit(-1)
+	sys.exit(-1)
 
 # do the switch
 
@@ -94,7 +94,7 @@ try:
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-	exit(-1)
+	sys.exit(-1)
 
 print('%s[*]%s Moving desired %srootfs_%s%s to %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, label, Fore.RESET, Fore.BLUE, Fore.RESET))
 
@@ -112,4 +112,4 @@ except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 		print('%s[!]%s You are now the proud owner of one broken Linux subsystem! To fix it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
 
-	exit(-1)
+	sys.exit(-1)

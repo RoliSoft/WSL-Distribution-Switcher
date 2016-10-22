@@ -80,7 +80,7 @@ def parse_image_arg(argv, can_be_file = False):
 				fname = names[0]
 			else:
 				print('%s[!]%s No files found matching %s%s%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET))
-				exit(-1)
+				sys.exit(-1)
 
 		else:
 			fname = 'rootfs_%s_%s' % (image.replace('/', '_'), tag)
@@ -95,7 +95,7 @@ def parse_image_arg(argv, can_be_file = False):
 
 		if not os.path.isfile(fname):
 			print('%s[!]%s %s%s%s is not an existing file.' % (Fore.RED, Fore.RESET, Fore.BLUE, fname, Fore.RESET))
-			exit(-1)
+			sys.exit(-1)
 
 		idx = -1
 
@@ -134,14 +134,14 @@ def probe_wsl(silent = False):
 			return None, None
 
 		print('%s[!]%s The Linux subsystem is not installed. Please go through the standard installation procedure first.' % (Fore.RED, Fore.RESET))
-		exit(-1)
+		sys.exit(-1)
 
 	if os.path.exists(os.path.join(basedir, 'temp')):
 		if silent:
 			return None, None
 
 		print('%s[!]%s The Linux subsystem is currently running. Please kill all instances before continuing.' % (Fore.RED, Fore.RESET))
-		exit(-1)
+		sys.exit(-1)
 
 	lxpath  = ''
 	lxpaths = [os.path.join(os.getenv('SystemRoot'), 'sysnative'), os.path.join(os.getenv('SystemRoot'), 'System32')]
@@ -153,7 +153,7 @@ def probe_wsl(silent = False):
 
 	if not lxpath and not silent:
 		print('%s[!]%s Unable to find %slxrun.exe%s in the expected locations.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
-		exit(-1)
+		sys.exit(-1)
 
 	return basedir, lxpath
 
