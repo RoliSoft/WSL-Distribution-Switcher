@@ -5,6 +5,7 @@ import os
 import sys
 import glob
 import time
+import winreg
 
 # try to get colors, but don't make it a nuisance by requiring dependencies
 
@@ -445,3 +446,41 @@ def clear_progress():
 		sys.stdout.write('\033]9;4;0\033\\\033[39m')
 
 	sys.stdout.flush()
+
+
+# functions to interact with the registry
+
+def get_lxss_user():
+	"""
+	Gets the active user inside WSL.
+
+	:return: Tuple of UID, GID and the name of the user.
+	"""
+
+	with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', access = winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as lxreg:
+		uid,  uid_type  = winreg.QueryValueEx(lxreg, 'DefaultUid')
+		gid,  gid_type  = winreg.QueryValueEx(lxreg, 'DefaultGid')
+		user, user_type = winreg.QueryValueEx(lxreg, 'DefaultUsername')
+
+		if uid_type != winreg.REG_DWORD or gid_type != winreg.REG_DWORD:
+			raise WindowsError('DefaultUid or DefaultGid is not DWORD.')
+
+		if user_type != winreg.REG_SZ:
+			raise WindowsError('DefaultUsername is not string.')
+
+	return uid, gid, user
+
+
+def set_lxss_user(uid, gid, user):
+	"""
+	Switches the active user inside WSL to the requested one.
+
+	:param uid: UID of the new user.
+	:param gid: GID of the new user.
+	:param user: Name of the new user.
+	"""
+
+	with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', access = winreg.KEY_WRITE | winreg.KEY_WOW64_64KEY) as lxreg:
+		winreg.SetValueEx(lxreg, 'DefaultUid', 0, winreg.REG_DWORD, uid)
+		winreg.SetValueEx(lxreg, 'DefaultGid', 0, winreg.REG_DWORD, gid)
+		winreg.SetValueEx(lxreg, 'DefaultUsername', 0, winreg.REG_SZ, user)

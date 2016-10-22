@@ -5,14 +5,13 @@ import stat
 import time
 import atexit
 import shutil
-import struct
 import tarfile
 import os.path
 import subprocess
 
 from collections import OrderedDict
 from ntfsea import ntfsea, lxattrb, stmode
-from utils import Fore, ProgressFileObject, parse_image_arg, probe_wsl, get_label, show_cursor, hide_cursor, draw_progress, clear_progress, escape_ntfs_invalid
+from utils import *
 
 try:
 	import PySquashfsImage
@@ -45,39 +44,31 @@ print('%s[*]%s Probing the Linux subsystem...' % (Fore.GREEN, Fore.RESET))
 
 basedir, lxpath = probe_wsl()
 
+uid      = 0
+gid      = 0
 user     = ''
 isroot   = False
 homedir  = ''
 homedirw = ''
 
-# somewhat a major issue, stdout and stderr can't be redirected, so this script can't monitor the output
-# of any of the launched commands. it can, however, receive the exit status, so that's something, I guess.
-# ref: https://github.com/Microsoft/BashOnWindows/issues/2
-
 try:
-	subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
-	out = os.path.join(basedir, 'rootfs/tmp/.wsl_usr.txt')
+	uid, gid, user = get_lxss_user()
 
-	if not os.path.isfile(out):
-		print('%s[!]%s Failed to get home directory of default user in WSL: Output file %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, out, Fore.RESET))
+	if uid == 0:
+		isroot = True
+		homedir = '/root'
+	else:
+		homedir = '/home/' + user
+
+	homedirw = os.path.join(basedir, homedir.lstrip('/'))
+
+	if len(homedir) == 0 or not os.path.isdir(homedirw):
+		print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
 		sys.exit(-1)
-
-	with open(out) as f:
-		homedir  = f.readline().strip()
-		homedirw = os.path.join(basedir, homedir.lstrip('/'))
-
-		if len(homedir) == 0 or not os.path.isdir(homedirw):
-			print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
-			sys.exit(-1)
-
-		user   = f.readline().strip()
-		isroot = user == 'root'
 
 	print('%s[*]%s Default user is %s%s%s at %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET, Fore.BLUE, homedir, Fore.RESET))
 
-	os.unlink(out)
-
-except subprocess.CalledProcessError as err:
+except BaseException as err:
 	print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 	sys.exit(-1)
 
@@ -456,54 +447,32 @@ if not isroot and havehooks:
 	print('%s[*]%s Switching default user to %sroot%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET))
 
 	try:
-		subprocess.check_output(['cmd', '/C', lxpath + '\\lxrun.exe', '/setdefaultuser', 'root'])
+		set_lxss_user(0, 0, 'root')
 
-	except subprocess.CalledProcessError as err:
+	except BaseException as err:
 		print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 		sys.exit(-1)
 
-	try:
-		subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c',
-		                       'echo $HOME > /tmp/.wsl_usr.txt; echo $USER >> /tmp/.wsl_usr.txt'])
-		out = os.path.join(basedir, 'rootfs/tmp/.wsl_usr.txt')
+	homedir  = '/root'
+	homedirw = os.path.join(basedir, homedir.lstrip('/'))
 
-		if not os.path.isfile(out):
-			print('%s[!]%s Failed to get home directory of default user in WSL: Output file %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, out, Fore.RESET))
-			sys.exit(-1)
-
-		with open(out) as f:
-			homedir = f.readline().strip()
-			homedirw = os.path.join(basedir, homedir.lstrip('/'))
-
-			if len(homedir) == 0 or not os.path.isdir(homedirw):
-				print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
-				sys.exit(-1)
-
-			user2 = f.readline().strip()
-
-			if user2 != 'root':
-				print('%s[!]%s Failed to switch default user to %sroot%s.' % (Fore.RED, Fore.RESET, Fore.YELLOW, Fore.RESET))
-				sys.exit(-1)
-
-		os.unlink(out)
-
-	except subprocess.CalledProcessError as err:
-		print('%s[!]%s Failed to get home directory of default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
+	if not os.path.isdir(homedirw):
+		print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
 		sys.exit(-1)
 
 	# since we switched to root, switch back to regular user on exit
 
-	def switch_user_back(user):
+	def switch_user_back(uid, gid, user):
 		print('%s[*]%s Switching default user back to %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
 
 		try:
-			subprocess.check_output(['cmd', '/C', lxpath + '\\lxrun.exe', '/setdefaultuser', user])
+			set_lxss_user(uid, gid, user)
 
-		except subprocess.CalledProcessError as err:
+		except BaseException as err:
 			print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 			sys.exit(-1)
 
-	atexit.register(switch_user_back, user)
+	atexit.register(switch_user_back, uid, gid, user)
 
 # run post-install hooks, if any
 
