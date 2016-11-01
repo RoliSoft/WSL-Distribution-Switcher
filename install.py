@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # coding=utf-8
+import re
 import sys
 import stat
 import time
@@ -478,6 +479,19 @@ if not isroot and havehooks:
 # run post-install hooks, if any
 
 if havehooks:
+
+	if not is_cygwin:
+		winver = sys.getwindowsversion().build
+
+	else:
+		wmic  = subprocess.check_output(['cmd', '/c', 'wmic.exe os get buildnumber'], universal_newlines = True)
+		match = re.match('BuildNumber[\s\r\n]+(\d+)', wmic)
+
+		if match is not None:
+			winver = int(match.group(1))
+		else:
+			winver = 0
+
 	hooks = ['all', image, image + '_' + tag]
 
 	for hook in hooks:
@@ -508,7 +522,7 @@ if havehooks:
 				continue
 
 			try:
-				subprocess.check_call(['cmd', '/C', path_trans(lxpath) + '\\bash.exe', '-c', 'REGULARUSER="%s" WINVER="%d" /root/%s' % (user if not isroot else '', sys.getwindowsversion().build, hookfile)])
+				subprocess.check_call(['cmd', '/C', path_trans(lxpath) + '\\bash.exe', '-c', 'REGULARUSER="%s" WINVER="%d" /root/%s' % (user if not isroot else '', winver, hookfile)])
 
 			except subprocess.CalledProcessError as err:
 				print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
