@@ -153,6 +153,7 @@ if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
 			operation(name)
 
 		shutil.rmtree(os.path.join(homedirw, 'rootfs-temp'), onerror = retry_rw)
+
 	except Exception:
 		pass
 
@@ -286,7 +287,7 @@ else:
 					os.chmod(file.name, stat.S_IWRITE)
 
 					attrb = lxattrb.fromtar(file).generate()
-					ntfsea.writeattr(file.name, 'lxattrb', attrb)
+					ntfsea.writeattr(path_trans(file.name), 'lxattrb', attrb)
 
 				except Exception as err:
 					clear_progress()
@@ -308,13 +309,13 @@ else:
 			# apply generic root:root 0755 to those without an attribute
 
 			for folder in subFolders:
-				folder = os.path.join(root, folder)
+				folder = path_trans(os.path.join(root, folder))
 
 				if ntfsea.getattr(folder, 'lxattrb') is None:
 					ntfsea.writeattr(folder, 'lxattrb', dattrb)
 
 			for file in files:
-				file = os.path.join(root, file)
+				file = path_trans(os.path.join(root, file))
 
 				if ntfsea.getattr(file, 'lxattrb') is None:
 					ntfsea.writeattr(file, 'lxattrb', fattrb)
@@ -327,6 +328,23 @@ else:
 	finally:
 		clear_progress()
 		show_cursor()
+
+# fix permission issues in case of Cygwin
+# for some reason, there seems to be an issue where a directory structure
+# created under Cygwin will have incorrect permissions under Windows, and
+# you will not be able to access it until these permissions are reset.
+# only a message saying "The permissions on rootfs-temp are incorrectly ordered,
+# which may cause some entries to be ineffective." will be displayed.
+# apparently this is by design: https://cygwin.com/ml/cygwin/2010-05/msg00393.html
+
+if is_cygwin:
+	print('%s[*]%s Fixing Cygwin permissions on %srootfs-temp%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
+
+	try:
+		output = subprocess.check_output(['cmd', '/c', 'icacls.exe %s /c /q /t /reset ' % path_trans(os.path.join(homedirw, 'rootfs-temp'))])
+	except Exception as err:
+		print('%s[!]%s Failed to fix permissions: %s' % (Fore.RED, Fore.RESET, err))
+		sys.exit(-1)
 
 # read label of current distribution
 
@@ -341,7 +359,7 @@ if not clabel:
 print('%s[*]%s Backing up current %srootfs%s to %srootfs_%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.BLUE, clabel, Fore.RESET))
 
 try:
-	subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs_' + clabel)])
+	subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs')), path_trans(os.path.join(basedir, 'rootfs_' + clabel))])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -352,14 +370,14 @@ print('%s[*]%s Switching to new %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.B
 time.sleep(1)
 
 try:
-	subprocess.check_output(['cmd', '/C', 'move', os.path.join(homedirw, 'rootfs-temp'), os.path.join(basedir, 'rootfs')])
+	subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(homedirw, 'rootfs-temp')), path_trans(os.path.join(basedir, 'rootfs'))])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to switch to new %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	print('%s[*]%s Rolling back to old %srootfs%s...' % (Fore.YELLOW, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 	try:
-		subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + clabel), os.path.join(basedir, 'rootfs')])
+		subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs_' + clabel)), path_trans(os.path.join(basedir, 'rootfs'))])
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -488,7 +506,7 @@ if havehooks:
 			hookpath = os.path.join(homedirw, hookfile)
 
 			try:
-				subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'echo -n > /root/%s && chmod +x /root/%s' % (hookfile, hookfile)])
+				subprocess.check_call(['cmd', '/C', path_trans(lxpath) + '\\bash.exe', '-c', 'echo -n > /root/%s && chmod +x /root/%s' % (hookfile, hookfile)])
 
 				if not os.path.isfile(hookpath):
 					print('%s[!]%s Failed to copy hook to WSL: File %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, hookpath, Fore.RESET))
@@ -507,7 +525,7 @@ if havehooks:
 				continue
 
 			try:
-				subprocess.check_call(['cmd', '/C', lxpath + '\\bash.exe', '-c', 'REGULARUSER="%s" WINVER="%d" /root/%s' % (user if not isroot else '', sys.getwindowsversion().build, hookfile)])
+				subprocess.check_call(['cmd', '/C', path_trans(lxpath) + '\\bash.exe', '-c', 'REGULARUSER="%s" WINVER="%d" /root/%s' % (user if not isroot else '', sys.getwindowsversion().build, hookfile)])
 
 			except subprocess.CalledProcessError as err:
 				print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))

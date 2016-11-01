@@ -1,7 +1,7 @@
 # -*- mode: python -*-
 #
 #	Compiles the .py files into .exe using PyInstaller.
-#	Run with: pyinstaller --noconfirm --clean pyinstaller.spec
+#	Run with: pyinstaller --clean --noconfirm pyinstaller.spec
 #
 
 import platform
@@ -27,5 +27,5 @@ for file in files:
 	system('xcopy dist\\' + file + '\\* dist\\switch /e /d /y /h /r /c')
 	system('rmdir /s /q dist\\' + file)
 
-system('xcopy C:\\Windows\\System32\\vcruntime140.dll dist\\switch\\vcruntime140.dll /y')
-system('move dist\\switch dist\\wsl-distrib-switcher')
+system('rmdir /s /q dist\\WSL-Distribution-Switcher')
+system('move dist\\switch dist\\WSL-Distribution-Switcher')

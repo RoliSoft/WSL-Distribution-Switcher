@@ -4,7 +4,7 @@ import glob
 import sys
 import os.path
 import subprocess
-from utils import Fore, parse_image_arg, probe_wsl, get_label
+from utils import Fore, parse_image_arg, probe_wsl, get_label, path_trans
 
 # handle arguments
 
@@ -90,7 +90,7 @@ if not os.path.isdir(os.path.join(basedir, 'rootfs_' + label)):
 print('%s[*]%s Moving current %srootfs%s to %srootfs_%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.BLUE, clabel, Fore.RESET))
 
 try:
-	subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs'), os.path.join(basedir, 'rootfs_' + clabel)])
+	subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs')), path_trans(os.path.join(basedir, 'rootfs_' + clabel))])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -99,14 +99,14 @@ except subprocess.CalledProcessError as err:
 print('%s[*]%s Moving desired %srootfs_%s%s to %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, label, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 try:
-	subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + label), os.path.join(basedir, 'rootfs')])
+	subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs_' + label)), path_trans(os.path.join(basedir, 'rootfs'))])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to switch to new %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	print('%s[*]%s Rolling back to old %srootfs%s...' % (Fore.YELLOW, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 	try:
-		subprocess.check_output(['cmd', '/C', 'move', os.path.join(basedir, 'rootfs_' + clabel), os.path.join(basedir, 'rootfs')])
+		subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs_' + clabel)), path_trans(os.path.join(basedir, 'rootfs'))])
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))

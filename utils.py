@@ -2,19 +2,31 @@
 # coding=utf-8
 import io
 import os
+import re
 import sys
 import glob
 import time
-import winreg
+import shlex
+import subprocess
 
-# try to get colors, but don't make it a nuisance by requiring dependencies
 
 has_filter = False
 has_progress = False
+has_winreg = False
 last_progress = 0
 conemu = False
+is_cygwin = sys.platform == 'cygwin'
+is_win32 = sys.platform == 'win32'
 
-if sys.platform == 'win32':
+try:
+	import winreg
+	has_winreg = True
+except ImportError:
+	pass
+
+# try to get colors, but don't make it a nuisance by requiring dependencies
+
+if is_win32:
 	try:
 		from colorama import init
 		init()
@@ -27,7 +39,7 @@ if sys.platform == 'win32':
 	class ConsoleCursorInfo(ctypes.Structure):
 		_fields_ = [("size", ctypes.c_int), ("visible", ctypes.c_byte)]
 
-if not sys.platform == 'win32' or has_filter:
+if not is_win32 or has_filter:
 	class Fore:
 		RED    = '\x1B[91m'
 		GREEN  = '\x1B[92m'
@@ -128,7 +140,13 @@ def probe_wsl(silent = False):
 	:return: Paths to the WSL directory and lxrun/bash executables.
 	"""
 
-	basedir = os.path.join(os.getenv('LocalAppData'), 'lxss')
+	global is_cygwin
+
+	if not is_cygwin:
+		basedir = os.path.join(os.getenv('LocalAppData'), 'lxss')
+	else:
+		basedir = subprocess.check_output('/usr/bin/cygpath -F 0x001c', shell = True, universal_newlines = True)
+		basedir = os.path.join(basedir.strip(), 'lxss')
 
 	if not os.path.isdir(basedir):
 		if silent:
@@ -144,8 +162,13 @@ def probe_wsl(silent = False):
 		print('%s[!]%s The Linux subsystem is currently running. Please kill all instances before continuing.' % (Fore.RED, Fore.RESET))
 		sys.exit(-1)
 
+	if not is_cygwin:
+		syspath = os.getenv('SystemRoot')
+	else:
+		syspath = subprocess.check_output('/usr/bin/cygpath -W', shell = True, universal_newlines = True).strip()
+
 	lxpath  = ''
-	lxpaths = [os.path.join(os.getenv('SystemRoot'), 'sysnative'), os.path.join(os.getenv('SystemRoot'), 'System32')]
+	lxpaths = [os.path.join(syspath, 'sysnative'), os.path.join(syspath, 'System32')]
 
 	for path in lxpaths:
 		if os.path.exists(os.path.join(path, 'lxrun.exe')):
@@ -157,6 +180,30 @@ def probe_wsl(silent = False):
 		sys.exit(-1)
 
 	return basedir, lxpath
+
+
+# translate the path between Windows and Cygwin
+
+def path_trans(path):
+	"""
+	Translate the path, if required.
+	Under the native Windows installation of Python, this function does nothing.
+	Under the Cygwin version, the provided path is translated to a Windows-native path.
+
+	:param path: Path to be translated.
+	:return: Translated path.
+	"""
+
+	global is_cygwin
+
+	if not is_cygwin or not path.startswith('/cygdrive/'):
+		return path
+
+	# too slow:
+	# subprocess.check_output('/usr/bin/cygpath -w ' + shlex.quote(path), shell = True, universal_newlines = True).strip()
+
+	path = path[10] + ':\\' + path[12:].replace('/', '\\')
+	return path
 
 
 # get label of rootfs
@@ -457,16 +504,51 @@ def get_lxss_user():
 	:return: Tuple of UID, GID and the name of the user.
 	"""
 
-	with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', access = winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as lxreg:
-		uid,  uid_type  = winreg.QueryValueEx(lxreg, 'DefaultUid')
-		gid,  gid_type  = winreg.QueryValueEx(lxreg, 'DefaultGid')
-		user, user_type = winreg.QueryValueEx(lxreg, 'DefaultUsername')
+	global has_winreg
 
-		if uid_type != winreg.REG_DWORD or gid_type != winreg.REG_DWORD:
-			raise WindowsError('DefaultUid or DefaultGid is not DWORD.')
+	if has_winreg:
 
-		if user_type != winreg.REG_SZ:
-			raise WindowsError('DefaultUsername is not string.')
+		# native implementation
+
+		with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', access = winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as lxreg:
+			uid,  uid_type  = winreg.QueryValueEx(lxreg, 'DefaultUid')
+			gid,  gid_type  = winreg.QueryValueEx(lxreg, 'DefaultGid')
+			user, user_type = winreg.QueryValueEx(lxreg, 'DefaultUsername')
+
+			if uid_type != winreg.REG_DWORD or gid_type != winreg.REG_DWORD:
+				raise WindowsError('DefaultUid or DefaultGid is not DWORD.')
+
+			if user_type != winreg.REG_SZ:
+				raise WindowsError('DefaultUsername is not string.')
+
+	else:
+
+		# workaround implementation
+
+		def read_key(key):
+			lines  = subprocess.check_output(['cmd', '/c', 'reg.exe query HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss /reg:64 /v ' + shlex.quote(key)], universal_newlines = True)
+			keyval = ''
+
+			for line in lines.splitlines():
+				line = line.strip()
+				if not line.startswith(key):
+					continue
+
+				match = re.match('^([a-z0-9]+)\s+(REG_[a-z0-9]+)\s+(.+)$', line, re.IGNORECASE)
+				if match is not None:
+					keyval = match.group(3)
+
+					if match.group(2) != 'REG_SZ' and keyval.startswith('0x'):
+						keyval = int(keyval, 16)
+
+			if keyval == '':
+				raise WindowsError('Failed to read key ' + key + ' through reg.exe')
+
+			return keyval
+
+		uid  = read_key('DefaultUid')
+		gid  = read_key('DefaultGid')
+		user = read_key('DefaultUsername')
 
 	return uid, gid, user
 
@@ -480,7 +562,24 @@ def set_lxss_user(uid, gid, user):
 	:param user: Name of the new user.
 	"""
 
-	with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', access = winreg.KEY_WRITE | winreg.KEY_WOW64_64KEY) as lxreg:
-		winreg.SetValueEx(lxreg, 'DefaultUid', 0, winreg.REG_DWORD, uid)
-		winreg.SetValueEx(lxreg, 'DefaultGid', 0, winreg.REG_DWORD, gid)
-		winreg.SetValueEx(lxreg, 'DefaultUsername', 0, winreg.REG_SZ, user)
+	global has_winreg
+
+	if has_winreg:
+
+		# native implementation
+
+		with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', access = winreg.KEY_WRITE | winreg.KEY_WOW64_64KEY) as lxreg:
+			winreg.SetValueEx(lxreg, 'DefaultUid', 0, winreg.REG_DWORD, uid)
+			winreg.SetValueEx(lxreg, 'DefaultGid', 0, winreg.REG_DWORD, gid)
+			winreg.SetValueEx(lxreg, 'DefaultUsername', 0, winreg.REG_SZ, user)
+
+	else:
+
+		# workaround implementation
+
+		def write_key(key, type, value):
+			subprocess.check_output(['cmd', '/c', 'reg.exe add HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss /reg:64 /v %s /t %s /d %s /f ' % (shlex.quote(key), shlex.quote(type), shlex.quote(str(value)))])
+
+		write_key('DefaultUid', 'REG_DWORD', uid)
+		write_key('DefaultGid', 'REG_DWORD', gid)
+		write_key('DefaultUsername', 'REG_SZ', user)
