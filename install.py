@@ -199,10 +199,10 @@ if fext == '.sfs' or fext == '.squashfs':
 
 				# apply lxattrb
 
-				os.chmod(winpath, stat.S_IWRITE)
+				os.chmod(winpath, 0o777)
 
 				attrb = lxattrb.fromsfs(file).generate()
-				ntfsea.writeattr(winpath, 'lxattrb', attrb)
+				ntfsea.writeattr(path_trans(winpath), 'lxattrb', attrb)
 
 			except Exception as err:
 				clear_progress()
@@ -284,7 +284,7 @@ else:
 
 					# apply lxattrb
 
-					os.chmod(file.name, stat.S_IWRITE)
+					os.chmod(file.name, 0o777)
 
 					attrb = lxattrb.fromtar(file).generate()
 					ntfsea.writeattr(path_trans(file.name), 'lxattrb', attrb)
@@ -328,23 +328,6 @@ else:
 	finally:
 		clear_progress()
 		show_cursor()
-
-# fix permission issues in case of Cygwin
-# for some reason, there seems to be an issue where a directory structure
-# created under Cygwin will have incorrect permissions under Windows, and
-# you will not be able to access it until these permissions are reset.
-# only a message saying "The permissions on rootfs-temp are incorrectly ordered,
-# which may cause some entries to be ineffective." will be displayed.
-# apparently this is by design: https://cygwin.com/ml/cygwin/2010-05/msg00393.html
-
-if is_cygwin:
-	print('%s[*]%s Fixing Cygwin permissions on %srootfs-temp%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
-
-	try:
-		output = subprocess.check_output(['cmd', '/c', 'icacls.exe %s /c /q /t /reset ' % path_trans(os.path.join(homedirw, 'rootfs-temp'))])
-	except Exception as err:
-		print('%s[!]%s Failed to fix permissions: %s' % (Fore.RED, Fore.RESET, err))
-		sys.exit(-1)
 
 # read label of current distribution
 
