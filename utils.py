@@ -7,6 +7,7 @@ import sys
 import glob
 import time
 import shlex
+import signal
 import subprocess
 
 
@@ -53,6 +54,18 @@ else:
 		BLUE   = ''
 		YELLOW = ''
 		RESET  = ''
+
+
+# registers for the interrupt signal in order to gracefully exit when Ctrl-C is hit
+
+def handle_sigint():
+	def signal_handler(signal, frame):
+		clear_progress()
+		show_cursor()
+		print('%s[!]%s Terminating early due to interruption.' % (Fore.RED, Fore.RESET))
+		sys.exit(-1)
+
+	signal.signal(signal.SIGINT, signal_handler)
 
 
 # parse image[:tag] | archive argument

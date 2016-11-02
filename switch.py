@@ -4,9 +4,11 @@ import glob
 import sys
 import os.path
 import subprocess
-from utils import Fore, parse_image_arg, probe_wsl, get_label, path_trans
+from utils import Fore, parse_image_arg, probe_wsl, get_label, path_trans, handle_sigint
 
 # handle arguments
+
+handle_sigint()
 
 if len(sys.argv) < 2:
 

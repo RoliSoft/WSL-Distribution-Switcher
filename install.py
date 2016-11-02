@@ -22,6 +22,8 @@ except ImportError:
 
 # handle arguments
 
+handle_sigint()
+
 imgarg   = ''
 runhooks = True
 

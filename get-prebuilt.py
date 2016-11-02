@@ -4,9 +4,11 @@ import os
 import sys
 import json
 import urllib.request
-from utils import Fore, parse_image_arg, chunked_copy, clear_progress
+from utils import Fore, parse_image_arg, chunked_copy, clear_progress, handle_sigint
 
 # handle arguments
+
+handle_sigint()
 
 if len(sys.argv) < 2:
 	print('usage: ./get-prebuilt.py image[:tag]')
