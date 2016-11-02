@@ -4,6 +4,7 @@ import io
 import os
 import re
 import sys
+import ssl
 import glob
 import time
 import shlex
@@ -11,13 +12,19 @@ import signal
 import subprocess
 
 
-has_filter = False
+has_filter   = False
 has_progress = False
-has_winreg = False
-last_progress = 0
-conemu = False
+has_winreg   = False
+has_certifi  = False
+
 is_cygwin = sys.platform == 'cygwin'
-is_win32 = sys.platform == 'win32'
+is_win32  = sys.platform == 'win32'
+is_conemu = False
+
+last_progress = 0
+
+
+# try importing the optional dependencies
 
 try:
 	import winreg
@@ -25,7 +32,11 @@ try:
 except ImportError:
 	pass
 
-# try to get colors, but don't make it a nuisance by requiring dependencies
+try:
+	import certifi
+	has_certifi = True
+except ImportError:
+	pass
 
 if is_win32:
 	try:
@@ -66,6 +77,21 @@ def handle_sigint():
 		sys.exit(-1)
 
 	signal.signal(signal.SIGINT, signal_handler)
+
+
+# check if any CA bundles were loaded or fallback to certifi otherwise
+
+def ensure_ca_load():
+	if ssl.create_default_context().cert_store_stats()['x509_ca'] == 0:
+		if has_certifi:
+			def create_certifi_context(purpose = ssl.Purpose.SERVER_AUTH, *, cafile = None, capath = None, cadata = None):
+				return ssl.create_default_context(purpose, cafile = certifi.where())
+
+			ssl._create_default_https_context = create_certifi_context
+
+		else:
+			print('%s[!]%s Python was unable to load any CA bundles. Additionally, the fallback %scertifi%s module is not available. Install it with %spip3 install certifi%s for TLS connection support.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
+			sys.exit(-1)
 
 
 # parse image[:tag] | archive argument
@@ -350,11 +376,11 @@ def hide_cursor():
 	Turns the cursor off in the terminal.
 	"""
 
-	global conemu
+	global is_conemu
 
 	if not sys.platform == 'win32':
 		sys.stdout.write('\033[?25l')
-		conemu = False
+		is_conemu = False
 
 	else:
 		ci = ConsoleCursorInfo()
@@ -362,7 +388,7 @@ def hide_cursor():
 		ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(ci))
 		ci.visible = False
 		ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(ci))
-		conemu = os.environ.get('ConEmuANSI') == 'ON'
+		is_conemu = os.environ.get('ConEmuANSI') == 'ON'
 
 
 # some characters are forbidden in NTFS, but are not in ext4. the most popular of these characters
@@ -394,7 +420,7 @@ def chunked_copy(name, source, dest):
 	:return: Number of bytes copied.
 	"""
 
-	global conemu
+	global is_conemu
 
 	size = int(source.info()['Content-Length'].strip())
 	recv = 0
@@ -458,7 +484,7 @@ def draw_progress(recv, size, name):
 	:param name: Name of the file to display.
 	"""
 
-	global conemu, has_progress, last_progress
+	global is_conemu, has_progress, last_progress
 
 	if recv > size:
 		recv = size
@@ -482,7 +508,7 @@ def draw_progress(recv, size, name):
 	bar = int(50 * recv / size)
 	sys.stdout.write('\r    %s [%s>%s] %0.2f%%' % (name, '=' * bar, ' ' * (50 - bar), pct))
 
-	if conemu:
+	if is_conemu:
 		sys.stdout.write('\033]9;4;1;%0.0f\033\\\033[39m' % pct)
 
 	sys.stdout.flush()
@@ -493,7 +519,7 @@ def clear_progress():
 	Clears the progress bar.
 	"""
 
-	global conemu, has_progress
+	global is_conemu, has_progress
 
 	if not has_progress:
 		return
@@ -502,7 +528,7 @@ def clear_progress():
 
 	sys.stdout.write('\r%s\r' % (' ' * (66 + 23)))
 
-	if conemu:
+	if is_conemu:
 		sys.stdout.write('\033]9;4;0\033\\\033[39m')
 
 	sys.stdout.flush()

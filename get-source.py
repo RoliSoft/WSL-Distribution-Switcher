@@ -2,11 +2,12 @@
 # coding=utf-8
 import sys
 import urllib.request
-from utils import Fore, parse_image_arg, chunked_copy, clear_progress, handle_sigint
+from utils import Fore, parse_image_arg, chunked_copy, clear_progress, handle_sigint, ensure_ca_load
 
 # handle arguments
 
 handle_sigint()
+ensure_ca_load()
 
 if len(sys.argv) < 2:
 	print('usage: ./get-source.py image[:tag]')
