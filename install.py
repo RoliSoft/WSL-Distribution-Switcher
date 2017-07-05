@@ -272,8 +272,10 @@ else:
 						if not os.path.exists(dirname):
 							os.makedirs(dirname, exist_ok=True)
 
+						# if a hardlink's linkname begins with a leading dot, the dot must be omitted,
+						# or else the symlink will be broken because it will be interpreted as relative
 						with open(file.name, 'w', encoding='utf-8') as link:
-							link.write(file.linkname)
+							link.write(file.linkname.lstrip('.') if file.islnk() else file.linkname)
 
 					elif file.isdev():
 
