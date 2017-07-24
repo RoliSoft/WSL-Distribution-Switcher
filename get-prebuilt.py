@@ -70,6 +70,21 @@ if os.path.exists(fname):
 	os.remove(fname)
 
 for layer in manifest['fsLayers']:
+	try:
+		with urllib.request.urlopen('https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull' % fimage) as f:
+
+			data  = json.loads(f.read().decode('utf-8'))
+			token = data['token']
+
+	except urllib.error.HTTPError as err:
+		print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
+		sys.exit(-1)
+
+	except KeyError as err:
+		print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
+		sys.exit(-1)
+	
+	
 	if layer['blobSum'] in dled:
 		continue
 
