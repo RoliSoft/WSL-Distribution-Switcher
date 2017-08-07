@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import time
 import urllib.request
 from utils import Fore, parse_image_arg, chunked_copy, clear_progress, handle_sigint, ensure_ca_load
 
@@ -19,24 +20,31 @@ image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 
 fimage = image if '/' in image else 'library/' + image
 token  = ''
+expire = 0
 
 # get auth token to Docker Hub
 
-print('%s[*]%s Requesting authorization token...' % (Fore.GREEN, Fore.RESET))
+def request_auth_token():
+	global token, expire, fimage
 
-try:
-	with urllib.request.urlopen('https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull' % fimage) as f:
+	print('%s[*]%s Requesting authorization token...' % (Fore.GREEN, Fore.RESET))
 
-		data  = json.loads(f.read().decode('utf-8'))
-		token = data['token']
+	try:
+		with urllib.request.urlopen('https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull' % fimage) as f:
 
-except urllib.error.HTTPError as err:
-	print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
-	sys.exit(-1)
+			data   = json.loads(f.read().decode('utf-8'))
+			token  = data['token']
+			expire = time.time() + data['expires_in']
 
-except KeyError as err:
-	print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
-	sys.exit(-1)
+	except urllib.error.HTTPError as err:
+		print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
+		sys.exit(-1)
+
+	except KeyError as err:
+		print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
+		sys.exit(-1)
+
+request_auth_token()
 
 # get the image manifest
 
@@ -70,21 +78,9 @@ if os.path.exists(fname):
 	os.remove(fname)
 
 for layer in manifest['fsLayers']:
-	try:
-		with urllib.request.urlopen('https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull' % fimage) as f:
+	if expire <= time.time():
+		request_auth_token()
 
-			data  = json.loads(f.read().decode('utf-8'))
-			token = data['token']
-
-	except urllib.error.HTTPError as err:
-		print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
-		sys.exit(-1)
-
-	except KeyError as err:
-		print('%s[!]%s Failed to authorization token: %s' % (Fore.RED, Fore.RESET, err))
-		sys.exit(-1)
-	
-	
 	if layer['blobSum'] in dled:
 		continue
 
