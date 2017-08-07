@@ -97,11 +97,19 @@ try:
 					tags  = line[1].split(', ')
 					isTag = tag in tags
 
-				elif line[0] == 'GitCommit':
+				elif line[0] == 'amd64-GitCommit':
 					commit = line[1]
 
+				elif line[0] == 'GitCommit':
+					if not commit:
+						commit = line[1]
+
+				elif line[0] == 'amd64-Directory':
+					path = '/' + line[1].strip('/')
+
 				elif line[0] == 'Directory':
-					path = '/' + line[1]
+					if not path:
+						path = '/' + line[1].strip('/')
 
 		# otherwise, fail miserably
 
