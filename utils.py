@@ -157,7 +157,7 @@ def parse_image_arg(argv, can_be_file = False):
 			if idx != -1:
 				break
 
-		label = argvl[:idx]
+		label = os.path.basename(argvl[:idx])
 
 		if label.startswith('rootfs_'):
 			label = label[len('rootfs_'):]
