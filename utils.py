@@ -182,8 +182,12 @@ def probe_wsl(silent = False):
 	global is_cygwin
 
 	if not is_cygwin:
-		basedir = os.path.join(os.getenv('LocalAppData'), 'lxss')
+		packagesSubFolder = os.path.join(os.getenv('LocalAppData'), 'Packages')
+		basedir = os.path.join(packagesSubFolder, 'CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc')
+		localStateDir = os.path.join(basedir, 'LocalState')
 	else:
+		print('JPST: not yet fixed when running this process via cygwin, sorry!')
+		sys.exit(-1)
 		basedir = subprocess.check_output('/usr/bin/cygpath -F 0x001c', shell = True, universal_newlines = True)
 		basedir = os.path.join(basedir.strip(), 'lxss')
 
@@ -194,7 +198,8 @@ def probe_wsl(silent = False):
 		print('%s[!]%s The Linux subsystem is not installed. Please go through the standard installation procedure first.' % (Fore.RED, Fore.RESET))
 		sys.exit(-1)
 
-	if os.path.exists(os.path.join(basedir, 'temp')) and os.listdir(os.path.join(basedir, 'temp')):
+	# new temp is in basedir/LocalState/temp
+	if os.path.exists(os.path.join(localStateDir, 'temp')) and os.listdir(os.path.join(localStateDir, 'temp')):
 		if silent:
 			return None, None
 
@@ -207,18 +212,32 @@ def probe_wsl(silent = False):
 		syspath = subprocess.check_output('/usr/bin/cygpath -W', shell = True, universal_newlines = True).strip()
 
 	lxpath  = ''
-	lxpaths = [os.path.join(syspath, 'sysnative'), os.path.join(syspath, 'System32')]
+	#methinks location in System32 is from legacy installer
+	lxpaths = [os.path.join(syspath, 'WinSxS\\amd64_microsoft-windows-lxss-installer_31bf3856ad364e35_10.0.16299.15_none_26fe0303c009a799'), os.path.join(syspath, 'System32')]
 
 	for path in lxpaths:
-		if os.path.exists(os.path.join(path, 'lxrun.exe')):
+		if os.path.exists(os.path.join(path, 'LxRun.exe')):
 			lxpath = path
 			break
 
 	if not lxpath and not silent:
 		print('%s[!]%s Unable to find %slxrun.exe%s in the expected locations.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
 		sys.exit(-1)
+		
+	bashpath = ''
+	#new iteration of WSL splitted all linux related resources in seperate folders inside C:\Windows\WinSxS\*
+	bashpaths = [os.path.join(syspath, 'WinSxS', 'amd64_microsoft-windows-lxss-bash_31bf3856ad364e35_10.0.16299.15_none_62878a822db68b25')]
+	
+	for path in bashpaths:
+		if os.path.exists(os.path.join(path, 'bash.exe')):
+			bashpath = path
+			break
+	
+	if not bashpath and not slient:
+		print('%s[!]%s Unable to find %bash.exe%s in the expected locations.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
+		sys.exit(-1)
 
-	return basedir, lxpath
+	return basedir, lxpath, bashpath
 
 
 # translate the path between Windows and Cygwin
@@ -542,83 +561,41 @@ def get_lxss_user():
 
 	:return: Tuple of UID, GID and the name of the user.
 	"""
-
-	global has_winreg
-
-	if has_winreg:
-
-		# native implementation
-
-		with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', access = winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as lxreg:
-			uid,  uid_type  = winreg.QueryValueEx(lxreg, 'DefaultUid')
-			gid,  gid_type  = winreg.QueryValueEx(lxreg, 'DefaultGid')
-			user, user_type = winreg.QueryValueEx(lxreg, 'DefaultUsername')
-
-			if uid_type != winreg.REG_DWORD or gid_type != winreg.REG_DWORD:
-				raise WindowsError('DefaultUid or DefaultGid is not DWORD.')
-
-			if user_type != winreg.REG_SZ:
-				raise WindowsError('DefaultUsername is not string.')
-
-	else:
-
-		# workaround implementation
-
-		def read_key(key):
-			lines  = subprocess.check_output(['cmd', '/c', 'reg.exe query HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss /reg:64 /v ' + shlex.quote(key)], universal_newlines = True)
-			keyval = ''
-
-			for line in lines.splitlines():
-				line = line.strip()
-				if not line.startswith(key):
-					continue
-
-				match = re.match('^([a-z0-9]+)\s+(REG_[a-z0-9]+)\s+(.+)$', line, re.IGNORECASE)
-				if match is not None:
-					keyval = match.group(3)
-
-					if match.group(2) != 'REG_SZ' and keyval.startswith('0x'):
-						keyval = int(keyval, 16)
-
-			if keyval == '':
-				raise WindowsError('Failed to read key ' + key + ' through reg.exe')
-
-			return keyval
-
-		uid  = read_key('DefaultUid')
-		gid  = read_key('DefaultGid')
-		user = read_key('DefaultUsername')
-
+	
+	#gets
+	user = subprocess.check_output(['cmd', '/c', 'ubuntu.exe run whoami'], universal_newlines = True).strip()
+	default_user_output = subprocess.check_output(['cmd', '/c', 'ubuntu.exe run id'], universal_newlines = True).strip()
+	
+	#splits
+	default_user_output = default_user_output.split(' ')
+	uidoutput = default_user_output[0]
+	gidoutput = default_user_output[1]
+	groupsoutput = default_user_output[2]
+	
+	#uid
+	uidoutput = uidoutput.split('=')
+	uidoutput = uidoutput[1]
+	uid = uidoutput.replace('('+user+')','')
+	
+	#gid
+	gidoutput = gidoutput.split('=')
+	gidoutput = gidoutput[1]
+	gid = gidoutput.replace('('+user+')','')
+	
 	return uid, gid, user
 
 
-def set_lxss_user(uid, gid, user):
+def set_default_user(user):
 	"""
 	Switches the active user inside WSL to the requested one.
 
-	:param uid: UID of the new user.
-	:param gid: GID of the new user.
 	:param user: Name of the new user.
 	"""
 
-	global has_winreg
+	try:
+		subprocess.check_call(['cmd', '/C', 'ubuntu.exe config --default-user %s' % (user)])
 
-	if has_winreg:
-
-		# native implementation
-
-		with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', access = winreg.KEY_WRITE | winreg.KEY_WOW64_64KEY) as lxreg:
-			winreg.SetValueEx(lxreg, 'DefaultUid', 0, winreg.REG_DWORD, uid)
-			winreg.SetValueEx(lxreg, 'DefaultGid', 0, winreg.REG_DWORD, gid)
-			winreg.SetValueEx(lxreg, 'DefaultUsername', 0, winreg.REG_SZ, user)
-
-	else:
-
-		# workaround implementation
-
-		def write_key(key, type, value):
-			subprocess.check_output(['cmd', '/c', 'reg.exe add HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss /reg:64 /v %s /t %s /d %s /f ' % (shlex.quote(key), shlex.quote(type), shlex.quote(str(value)))])
-
-		write_key('DefaultUid', 'REG_DWORD', uid)
-		write_key('DefaultGid', 'REG_DWORD', gid)
-		write_key('DefaultUsername', 'REG_SZ', user)
+	except subprocess.CalledProcessError as err:
+		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
+		print('%s[!]%s You are now the proud owner of one broken Linux subsystem! To fix it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.RED, Fore.RESET, Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
+		sys.exit(-1)

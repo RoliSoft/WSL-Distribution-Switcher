@@ -45,28 +45,35 @@ image, tag, fname, label = parse_image_arg(imgarg, True)
 
 print('%s[*]%s Probing the Linux subsystem...' % (Fore.GREEN, Fore.RESET))
 
-basedir, lxpath = probe_wsl()
+basedir, lxpath, bashpath = probe_wsl()
+#fix basedir to add LocalState\rootfs
+basedir = os.path.join(basedir, 'LocalState')
+rootFsDir = os.path.join(basedir, 'rootfs')
+rootFsTempDir = os.path.join(basedir, 'rootfs-temp')
+
+print('%s[*]%s Linux subsystem OK.' % (Fore.GREEN, Fore.RESET))
+
+
 
 uid      = 0
 gid      = 0
 user     = ''
 isroot   = False
 homedir  = ''
-homedirw = ''
+homedirFQDN = ''
 
 try:
 	uid, gid, user = get_lxss_user()
-
-	if uid == 0:
+	if user == 'root':
 		isroot = True
 		homedir = '/root'
 	else:
 		homedir = '/home/' + user
 
-	homedirw = os.path.join(basedir, homedir.lstrip('/'))
+	homedirFQDN = os.path.join(rootFsDir, homedir.lstrip('/'))
 
-	if len(homedir) == 0 or not os.path.isdir(homedirw):
-		print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
+	if len(homedir) == 0 or not os.path.isdir(homedirFQDN):
+		print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirFQDN, Fore.RESET))
 		sys.exit(-1)
 
 	print('%s[*]%s Default user is %s%s%s at %s%s%s.' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET, Fore.BLUE, homedir, Fore.RESET))
@@ -76,7 +83,6 @@ except BaseException as err:
 	sys.exit(-1)
 
 # check squashfs prerequisites
-
 fext = os.path.splitext(fname)[-1].lower()
 
 if (fext == '.sfs' or fext == '.squashfs') and not havesquashfs:
@@ -95,7 +101,7 @@ etcgshadowuser = ''
 
 if not isroot:
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), newline='\n') as f:
+		with open(os.path.join(rootFsDir, 'etc', 'passwd'), newline='\n') as f:
 			for line in f.readlines():
 				if line.startswith(user + ':'):
 					etcpasswduser = line.strip()
@@ -105,7 +111,7 @@ if not isroot:
 		sys.exit(-1)
 
 try:
-	with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), newline='\n') as f:
+	with open(os.path.join(rootFsDir, 'etc', 'shadow'), newline='\n') as f:
 		for line in f.readlines():
 			if line.startswith('root:'):
 				etcshadowroot = line.strip()
@@ -118,7 +124,7 @@ except OSError as err:
 
 if not isroot:
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'group'), newline='\n') as f:
+		with open(os.path.join(rootFsDir, 'etc', 'group'), newline='\n') as f:
 			for line in f.readlines():
 				if line.startswith(user + ':'):
 					etcgroupuser = line.strip()
@@ -128,7 +134,7 @@ if not isroot:
 		sys.exit(-1)
 
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow'), newline='\n') as f:
+		with open(os.path.join(rootFsDir, 'etc', 'gshadow'), newline='\n') as f:
 			for line in f.readlines():
 				if line.startswith(user + ':'):
 					etcgshadowuser = line.strip()
@@ -139,15 +145,17 @@ if not isroot:
 
 if etcshadowroot:
 	parts = etcshadowroot.split(':')
-
 	if parts[1] == '*' or parts[1].startswith('!'):
-		etcshadowroot = ''
+		#etcshadowroot = ''
+		#set user password as root pw
+		print('%s[*]%s Copying password of user %s to root since most images have no sudoers' % (Fore.GREEN, Fore.RESET, user))
+		if not isroot:
+			etcshadowroot = etcshadowuser
 	else:
 		etcshadowroot = parts[1]
 
 # remove old remnants
-
-if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
+if os.path.exists(rootFsTempDir):
 	print('%s[*]%s Removing leftover %srootfs-temp%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 	try:
@@ -155,17 +163,15 @@ if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
 			os.chmod(name, stat.S_IWRITE)
 			operation(name)
 
-		shutil.rmtree(os.path.join(homedirw, 'rootfs-temp'), onerror = retry_rw)
+		shutil.rmtree(rootFsTempDir, onerror = retry_rw)
 
 	except Exception:
 		pass
 
 	# ensure it's removed
-
-	if os.path.exists(os.path.join(homedirw, 'rootfs-temp')):
+	if os.path.exists(rootFsTempDir):
 		print('%s[*]%s Failed to remove leftover %srootfs-temp%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
 		sys.exit(-1)
-
 # extract archive
 
 print('%s[*]%s Beginning extraction...' % (Fore.GREEN, Fore.RESET))
@@ -176,7 +182,7 @@ if fext == '.sfs' or fext == '.squashfs':
 
 	try:
 		img  = PySquashfsImage.SquashFsImage(fname)
-		path = os.path.join(homedirw, 'rootfs-temp')
+		path = rootFsTempDir
 
 		hide_cursor()
 		ntfsea.init()
@@ -244,8 +250,7 @@ else:
 
 	try:
 		ntfsea.init()
-		path = os.path.join(homedirw, 'rootfs-temp')
-
+		path = rootFsTempDir
 		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = True, errorlevel = 2) as tar:
 
 			file = tar.next()
@@ -336,7 +341,7 @@ else:
 
 # read label of current distribution
 
-clabel = get_label(os.path.join(basedir, 'rootfs'))
+clabel = get_label(rootFsDir)
 
 if not clabel:
 	clabel = 'ubuntu_trusty'
@@ -347,7 +352,7 @@ if not clabel:
 print('%s[*]%s Backing up current %srootfs%s to %srootfs_%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.BLUE, clabel, Fore.RESET))
 
 try:
-	subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs')), path_trans(os.path.join(basedir, 'rootfs_' + clabel))])
+	subprocess.check_output(['cmd', '/C', 'move', path_trans(rootFsDir), path_trans(os.path.join(basedir, 'rootfs_' + clabel))])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -355,17 +360,17 @@ except subprocess.CalledProcessError as err:
 
 print('%s[*]%s Switching to new %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
 
-time.sleep(1)
+time.sleep(4)
 
 try:
-	subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(homedirw, 'rootfs-temp')), path_trans(os.path.join(basedir, 'rootfs'))])
+	subprocess.check_output(['cmd', '/C', 'move', path_trans(rootFsTempDir), path_trans(rootFsDir)])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to switch to new %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	print('%s[*]%s Rolling back to old %srootfs%s...' % (Fore.YELLOW, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 	try:
-		subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs_' + clabel)), path_trans(os.path.join(basedir, 'rootfs'))])
+		subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs_' + clabel)), path_trans(rootFsDir)])
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -376,21 +381,22 @@ except subprocess.CalledProcessError as err:
 # save label
 
 try:
-	with open(os.path.join(basedir, 'rootfs', '.switch_label'), 'w') as f:
+	with open(os.path.join(rootFsDir, '.switch_label'), 'w') as f:
 		f.write(label + '\n')
 
 except OSError as err:
 	print('%s[!]%s Failed to open file %s/.switch_label%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
-
 # append user entries to /etc/{passwd,shadow,group,gshadow}
 
-print('%s[*]%s Writing entries of %sroot%s%s to %s/etc/{passwd,shadow,group,gshadow}%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET, (' and %s%s%s' % (Fore.YELLOW, user, Fore.RESET) if not isroot else ''), Fore.BLUE, Fore.RESET))
+print('%s[*]%s Writing entries of %sroot%s%s to %s/etc/{passwd,shadow,group,gshadow,}%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET, (' and %s%s%s' % (Fore.YELLOW, user, Fore.RESET) if not isroot else ''), Fore.BLUE, Fore.RESET))
 
 if not isroot:
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'passwd'), 'a', newline='\n') as f:
+		with open(os.path.join(rootFsDir, 'etc', 'passwd'), 'a', newline='\n') as f:
 			f.write(etcpasswduser + '\n')
-
+		#sudo not installed via image
+		#with open(os.path.join(rootFsDir, 'etc', 'sudoers'), 'a', newline='\n') as f:
+		#	f.write(u + ' ALL=(ALL) ALL' + '\n')
 	except OSError as err:
 		print('%s[!]%s Failed to open file %s/etc/passwd%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 
@@ -398,14 +404,18 @@ if not isroot or etcshadowroot:
 	try:
 		shadows = []
 
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'shadow'), 'r+', newline='\n') as f:
+		with open(os.path.join(rootFsDir, 'etc', 'shadow'), 'r+', newline='\n') as f:
 			shadows = f.readlines()
 
 			if etcshadowroot:
 				for i in range(len(shadows)):
 					if shadows[i].startswith('root:'):
 						parts = shadows[i].split(':')
-						parts[1] = etcshadowroot
+						#parts[1] = etcshadowroot
+						#jpst
+						rootpw_parts = etcshadowroot.split(':')
+						rootpw = rootpw_parts[1]
+						parts[1] = rootpw
 						shadows[i] = ':'.join(parts)
 
 			f.seek(0)
@@ -419,14 +429,14 @@ if not isroot or etcshadowroot:
 
 if not isroot:
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'group'), 'a', newline='\n') as f:
+		with open(os.path.join(rootFsDir, 'etc', 'group'), 'a', newline='\n') as f:
 			f.write(etcgroupuser + '\n')
 
 	except OSError as err:
 		print('%s[!]%s Failed to open file %s/etc/group%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 
 	try:
-		with open(os.path.join(basedir, 'rootfs', 'etc', 'gshadow'), 'a', newline='\n') as f:
+		with open(os.path.join(rootFsDir, 'etc', 'gshadow'), 'a', newline='\n') as f:
 			f.write(etcgshadowuser + '\n')
 
 	except OSError as err:
@@ -453,17 +463,17 @@ if not isroot and havehooks:
 	print('%s[*]%s Switching default user to %sroot%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, Fore.RESET))
 
 	try:
-		set_lxss_user(0, 0, 'root')
+		set_default_user('root')
 
 	except BaseException as err:
 		print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 		sys.exit(-1)
 
 	homedir  = '/root'
-	homedirw = os.path.join(basedir, homedir.lstrip('/'))
+	homedirFQDN = os.path.join(rootFsDir, homedir.lstrip('/'))
 
-	if not os.path.isdir(homedirw):
-		print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirw, Fore.RESET))
+	if not os.path.isdir(homedirFQDN):
+		print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirFQDN, Fore.RESET))
 		sys.exit(-1)
 
 	# since we switched to root, switch back to regular user on exit
@@ -472,13 +482,14 @@ if not isroot and havehooks:
 		print('%s[*]%s Switching default user back to %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.YELLOW, user, Fore.RESET))
 
 		try:
-			set_lxss_user(uid, gid, user)
+			set_default_user(user)
 
 		except BaseException as err:
 			print('%s[!]%s Failed to switch default user in WSL: %s' % (Fore.RED, Fore.RESET, err))
 			sys.exit(-1)
 
 	atexit.register(switch_user_back, uid, gid, user)
+
 
 # run post-install hooks, if any
 
@@ -499,15 +510,16 @@ if havehooks:
 	hooks = ['all', image, image + '_' + tag]
 
 	for hook in hooks:
+		print("DEBUG: hook="+hook)
 		hookfile = 'hook_postinstall_%s.sh' % hook
 
 		if os.path.isfile(hookfile):
 			print('%s[*]%s Running post-install hook %s%s%s...' % (Fore.GREEN, Fore.RESET, Fore.GREEN, hook, Fore.RESET))
 
-			hookpath = os.path.join(homedirw, hookfile)
-
+			hookpath = os.path.join(homedirFQDN, hookfile)
+			print("DEBUG: hookpath="+hookpath)
 			try:
-				subprocess.check_call(['cmd', '/C', path_trans(lxpath) + '\\bash.exe', '-c', 'echo -n > /root/%s && chmod +x /root/%s' % (hookfile, hookfile)])
+				subprocess.check_call(['cmd', '/C', path_trans(bashpath) + '\\bash.exe', '-c', 'echo -n > /root/%s && chmod +x /root/%s' % (hookfile, hookfile)])
 
 				if not os.path.isfile(hookpath):
 					print('%s[!]%s Failed to copy hook to WSL: File %s%s%s not present.' % (Fore.RED, Fore.RESET, Fore.BLUE, hookpath, Fore.RESET))
@@ -526,10 +538,12 @@ if havehooks:
 				continue
 
 			try:
-				subprocess.check_call(['cmd', '/C', path_trans(lxpath) + '\\bash.exe', '-c', 'REGULARUSER="%s" WINVER="%d" /root/%s' % (user if not isroot else '', winver, hookfile)])
+				subprocess.check_call(['cmd', '/C', path_trans(bashpath) + '\\bash.exe', '-c', 'REGULARUSER="%s" WINVER="%d" /root/%s' % (user if not isroot else '', winver, hookfile)])
 
 			except subprocess.CalledProcessError as err:
 				print('%s[!]%s Failed to run hook in WSL: %s' % (Fore.RED, Fore.RESET, err))
 				continue
 
 			os.unlink(hookpath)
+
+print('%s[*]%s Finished install.' % (Fore.GREEN, Fore.RESET))
