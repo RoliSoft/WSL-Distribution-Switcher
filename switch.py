@@ -18,13 +18,14 @@ if len(sys.argv) < 2:
 
 	# check if there are any installations
 
-	basedir, lxpath = probe_wsl(True)
+	basedir, lxpath, bashpath = probe_wsl(True)
 
 	if basedir:
-
+		#fix basedir to add LocalState\rootfs
+		basedir = os.path.join(basedir, 'LocalState')
 		names = glob.glob(os.path.join(basedir, 'rootfs*'))
-		not_trusty = True
-		has_trusty = False
+		not_debian = True
+		has_debian = False
 
 		if len(names) > 0:
 
@@ -37,19 +38,19 @@ if len(sys.argv) < 2:
 				if len(name) != 2:
 					continue
 
-				if name[0] == 'ubuntu' and name[1] == 'trusty':
-					has_trusty = True
+				if name[0] == 'debian' and name[1] == '9':
+					has_debian = True
 
 					if active:
-						not_trusty = False
+						not_debian = False
 
 				print('  - %s%s%s:%s%s%s%s' % (Fore.YELLOW, name[0], Fore.RESET, Fore.YELLOW, name[1], Fore.RESET, ('%s*%s' % (Fore.GREEN, Fore.RESET) if active else '')))
 
-		if not_trusty:
+		if not_debian:
 			print()
 
-			if has_trusty:
-				print('To switch back to the default distribution, specify %subuntu%s:%strusty%s as the argument.' % (Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
+			if has_debian:
+				print('To switch back to the default distribution, specify %sdebian%s:%s9%s as the argument.' % (Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))
 			else:
 				print('You do not seem to have the default distribution installed anymore.\nTo reinstall it, run %slxrun /uninstall%s and %slxrun /install%s from the command prompt.' % (Fore.GREEN, Fore.RESET, Fore.GREEN, Fore.RESET))
 
@@ -61,14 +62,16 @@ image, tag, fname, label = parse_image_arg(sys.argv[1], False)
 
 print('%s[*]%s Probing the Linux subsystem...' % (Fore.GREEN, Fore.RESET))
 
-basedir, lxpath = probe_wsl()
+basedir, lxpath, bashpath = probe_wsl()
+#fix basedir to add LocalState\rootfs
+basedir = os.path.join(basedir, 'LocalState')
 
 # read label of current distribution
 
 clabel = get_label(os.path.join(basedir, 'rootfs'))
 
 if not clabel:
-	clabel = 'ubuntu_trusty'
+	clabel = 'debian_9'
 
 	if label == clabel:
 		print('%s[!]%s No %s/.switch_label%s found, and the target rootfs is %subuntu%s:%strusty%s. Cannot continue.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.YELLOW, Fore.RESET, Fore.YELLOW, Fore.RESET))

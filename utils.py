@@ -183,7 +183,7 @@ def probe_wsl(silent = False):
 
 	if not is_cygwin:
 		packagesSubFolder = os.path.join(os.getenv('LocalAppData'), 'Packages')
-		basedir = os.path.join(packagesSubFolder, 'CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc')
+		basedir = os.path.join(packagesSubFolder, 'TheDebianProject.DebianGNULinux_76v4gfsz19hv4')
 		localStateDir = os.path.join(basedir, 'LocalState')
 	else:
 		print('JPST: not yet fixed when running this process via cygwin, sorry!')
@@ -193,7 +193,7 @@ def probe_wsl(silent = False):
 
 	if not os.path.isdir(basedir):
 		if silent:
-			return None, None
+			return None, None, None
 
 		print('%s[!]%s The Linux subsystem is not installed. Please go through the standard installation procedure first.' % (Fore.RED, Fore.RESET))
 		sys.exit(-1)
@@ -201,7 +201,7 @@ def probe_wsl(silent = False):
 	# new temp is in basedir/LocalState/temp
 	if os.path.exists(os.path.join(localStateDir, 'temp')) and os.listdir(os.path.join(localStateDir, 'temp')):
 		if silent:
-			return None, None
+			return None, None, None
 
 		print('%s[!]%s The Linux subsystem is currently running. Please kill all instances before continuing.' % (Fore.RED, Fore.RESET))
 		sys.exit(-1)
@@ -213,7 +213,7 @@ def probe_wsl(silent = False):
 
 	lxpath  = ''
 	#methinks location in System32 is from legacy installer
-	lxpaths = [os.path.join(syspath, 'WinSxS\\amd64_microsoft-windows-lxss-installer_31bf3856ad364e35_10.0.16299.15_none_26fe0303c009a799'), os.path.join(syspath, 'System32')]
+	lxpaths = [os.path.join(syspath, 'WinSxS\\amd64_microsoft-windows-lxss-installer_31bf3856ad364e35_10.0.17134.1_none_e9926368b80f9a59'), os.path.join(syspath, 'System32')]
 
 	for path in lxpaths:
 		if os.path.exists(os.path.join(path, 'LxRun.exe')):
@@ -226,15 +226,15 @@ def probe_wsl(silent = False):
 		
 	bashpath = ''
 	#new iteration of WSL splitted all linux related resources in seperate folders inside C:\Windows\WinSxS\*
-	bashpaths = [os.path.join(syspath, 'WinSxS', 'amd64_microsoft-windows-lxss-bash_31bf3856ad364e35_10.0.16299.15_none_62878a822db68b25')]
+	bashpaths = [os.path.join(syspath, 'WinSxS', 'amd64_microsoft-windows-lxss-bash_31bf3856ad364e35_10.0.17134.1_none_251beae725bc7de5'), os.path.join(syspath, 'System32')]
 	
 	for path in bashpaths:
 		if os.path.exists(os.path.join(path, 'bash.exe')):
 			bashpath = path
 			break
 	
-	if not bashpath and not slient:
-		print('%s[!]%s Unable to find %bash.exe%s in the expected locations.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
+	if not bashpath and not silent:
+		print('%s[!]%s Unable to find %sbash.exe%s in the expected locations.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
 		sys.exit(-1)
 
 	return basedir, lxpath, bashpath
@@ -563,8 +563,8 @@ def get_lxss_user():
 	"""
 	
 	#gets
-	user = subprocess.check_output(['cmd', '/c', 'ubuntu.exe run whoami'], universal_newlines = True).strip()
-	default_user_output = subprocess.check_output(['cmd', '/c', 'ubuntu.exe run id'], universal_newlines = True).strip()
+	user = subprocess.check_output(['cmd', '/c', 'debian.exe run whoami'], universal_newlines = True).strip()
+	default_user_output = subprocess.check_output(['cmd', '/c', 'debian.exe run id'], universal_newlines = True).strip()
 	
 	#splits
 	default_user_output = default_user_output.split(' ')
@@ -593,7 +593,7 @@ def set_default_user(user):
 	"""
 
 	try:
-		subprocess.check_call(['cmd', '/C', 'ubuntu.exe config --default-user %s' % (user)])
+		subprocess.check_call(['cmd', '/C', 'debian.exe config --default-user %s' % (user)])
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
