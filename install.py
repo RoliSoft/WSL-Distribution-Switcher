@@ -46,10 +46,10 @@ image, tag, fname, label = parse_image_arg(imgarg, True)
 print('%s[*]%s Probing the Linux subsystem...' % (Fore.GREEN, Fore.RESET))
 
 basedir, lxpath, bashpath = probe_wsl()
-#fix basedir to add LocalState\rootfs
+# fix basedir to add LocalState\rootfs
 basedir = os.path.join(basedir, 'LocalState')
-rootFsDir = os.path.join(basedir, 'rootfs')
-rootFsTempDir = os.path.join(basedir, 'rootfs-temp')
+rootfsdir = os.path.join(basedir, 'rootfs')
+rootfstempdir = os.path.join(basedir, 'rootfs-temp')
 
 print('%s[*]%s Linux subsystem OK.' % (Fore.GREEN, Fore.RESET))
 
@@ -70,7 +70,7 @@ try:
 	else:
 		homedir = '/home/' + user
 
-	homedirFQDN = os.path.join(rootFsDir, homedir.lstrip('/'))
+	homedirFQDN = os.path.join(rootfsdir, homedir.lstrip('/'))
 
 	if len(homedir) == 0 or not os.path.isdir(homedirFQDN):
 		print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirFQDN, Fore.RESET))
@@ -101,7 +101,7 @@ etcgshadowuser = ''
 
 if not isroot:
 	try:
-		with open(os.path.join(rootFsDir, 'etc', 'passwd'), newline='\n') as f:
+		with open(os.path.join(rootfsdir, 'etc', 'passwd'), newline='\n') as f:
 			for line in f.readlines():
 				if line.startswith(user + ':'):
 					etcpasswduser = line.strip()
@@ -111,7 +111,7 @@ if not isroot:
 		sys.exit(-1)
 
 try:
-	with open(os.path.join(rootFsDir, 'etc', 'shadow'), newline='\n') as f:
+	with open(os.path.join(rootfsdir, 'etc', 'shadow'), newline='\n') as f:
 		for line in f.readlines():
 			if line.startswith('root:'):
 				etcshadowroot = line.strip()
@@ -124,7 +124,7 @@ except OSError as err:
 
 if not isroot:
 	try:
-		with open(os.path.join(rootFsDir, 'etc', 'group'), newline='\n') as f:
+		with open(os.path.join(rootfsdir, 'etc', 'group'), newline='\n') as f:
 			for line in f.readlines():
 				if line.startswith(user + ':'):
 					etcgroupuser = line.strip()
@@ -134,7 +134,7 @@ if not isroot:
 		sys.exit(-1)
 
 	try:
-		with open(os.path.join(rootFsDir, 'etc', 'gshadow'), newline='\n') as f:
+		with open(os.path.join(rootfsdir, 'etc', 'gshadow'), newline='\n') as f:
 			for line in f.readlines():
 				if line.startswith(user + ':'):
 					etcgshadowuser = line.strip()
@@ -155,7 +155,7 @@ if etcshadowroot:
 		etcshadowroot = parts[1]
 
 # remove old remnants
-if os.path.exists(rootFsTempDir):
+if os.path.exists(rootfstempdir):
 	print('%s[*]%s Removing leftover %srootfs-temp%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 	try:
@@ -163,13 +163,13 @@ if os.path.exists(rootFsTempDir):
 			os.chmod(name, stat.S_IWRITE)
 			operation(name)
 
-		shutil.rmtree(rootFsTempDir, onerror = retry_rw)
+		shutil.rmtree(rootfstempdir, onerror = retry_rw)
 
 	except Exception:
 		pass
 
 	# ensure it's removed
-	if os.path.exists(rootFsTempDir):
+	if os.path.exists(rootfstempdir):
 		print('%s[*]%s Failed to remove leftover %srootfs-temp%s.' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET))
 		sys.exit(-1)
 # extract archive
@@ -182,7 +182,7 @@ if fext == '.sfs' or fext == '.squashfs':
 
 	try:
 		img  = PySquashfsImage.SquashFsImage(fname)
-		path = rootFsTempDir
+		path = rootfstempdir
 
 		hide_cursor()
 		ntfsea.init()
@@ -250,7 +250,7 @@ else:
 
 	try:
 		ntfsea.init()
-		path = rootFsTempDir
+		path = rootfstempdir
 		with tarfile.open(fileobj = fileobj, mode = 'r:*', dereference = True, ignore_zeros = True, errorlevel = 2) as tar:
 
 			file = tar.next()
@@ -341,7 +341,7 @@ else:
 
 # read label of current distribution
 
-clabel = get_label(rootFsDir)
+clabel = get_label(rootfsdir)
 
 if not clabel:
 	clabel = 'ubuntu_trusty'
@@ -352,7 +352,7 @@ if not clabel:
 print('%s[*]%s Backing up current %srootfs%s to %srootfs_%s%s...' % (Fore.GREEN, Fore.RESET, Fore.BLUE, Fore.RESET, Fore.BLUE, clabel, Fore.RESET))
 
 try:
-	subprocess.check_output(['cmd', '/C', 'move', path_trans(rootFsDir), path_trans(os.path.join(basedir, 'rootfs_' + clabel))])
+	subprocess.check_output(['cmd', '/C', 'move', path_trans(rootfsdir), path_trans(os.path.join(basedir, 'rootfs_' + clabel))])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to backup current %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -363,14 +363,14 @@ print('%s[*]%s Switching to new %srootfs%s...' % (Fore.GREEN, Fore.RESET, Fore.B
 time.sleep(4)
 
 try:
-	subprocess.check_output(['cmd', '/C', 'move', path_trans(rootFsTempDir), path_trans(rootFsDir)])
+	subprocess.check_output(['cmd', '/C', 'move', path_trans(rootfstempdir), path_trans(rootfsdir)])
 
 except subprocess.CalledProcessError as err:
 	print('%s[!]%s Failed to switch to new %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 	print('%s[*]%s Rolling back to old %srootfs%s...' % (Fore.YELLOW, Fore.RESET, Fore.BLUE, Fore.RESET))
 
 	try:
-		subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs_' + clabel)), path_trans(rootFsDir)])
+		subprocess.check_output(['cmd', '/C', 'move', path_trans(os.path.join(basedir, 'rootfs_' + clabel)), path_trans(rootfsdir)])
 
 	except subprocess.CalledProcessError as err:
 		print('%s[!]%s Failed to roll back to old %srootfs%s: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
@@ -381,7 +381,7 @@ except subprocess.CalledProcessError as err:
 # save label
 
 try:
-	with open(os.path.join(rootFsDir, '.switch_label'), 'w') as f:
+	with open(os.path.join(rootfsdir, '.switch_label'), 'w') as f:
 		f.write(label + '\n')
 
 except OSError as err:
@@ -392,7 +392,7 @@ print('%s[*]%s Writing entries of %sroot%s%s to %s/etc/{passwd,shadow,group,gsha
 
 if not isroot:
 	try:
-		with open(os.path.join(rootFsDir, 'etc', 'passwd'), 'a', newline='\n') as f:
+		with open(os.path.join(rootfsdir, 'etc', 'passwd'), 'a', newline='\n') as f:
 			f.write(etcpasswduser + '\n')
 		#sudo not installed via image
 		#with open(os.path.join(rootFsDir, 'etc', 'sudoers'), 'a', newline='\n') as f:
@@ -404,7 +404,7 @@ if not isroot or etcshadowroot:
 	try:
 		shadows = []
 
-		with open(os.path.join(rootFsDir, 'etc', 'shadow'), 'r+', newline='\n') as f:
+		with open(os.path.join(rootfsdir, 'etc', 'shadow'), 'r+', newline='\n') as f:
 			shadows = f.readlines()
 
 			if etcshadowroot:
@@ -429,14 +429,14 @@ if not isroot or etcshadowroot:
 
 if not isroot:
 	try:
-		with open(os.path.join(rootFsDir, 'etc', 'group'), 'a', newline='\n') as f:
+		with open(os.path.join(rootfsdir, 'etc', 'group'), 'a', newline='\n') as f:
 			f.write(etcgroupuser + '\n')
 
 	except OSError as err:
 		print('%s[!]%s Failed to open file %s/etc/group%s for writing: %s' % (Fore.RED, Fore.RESET, Fore.BLUE, Fore.RESET, err))
 
 	try:
-		with open(os.path.join(rootFsDir, 'etc', 'gshadow'), 'a', newline='\n') as f:
+		with open(os.path.join(rootfsdir, 'etc', 'gshadow'), 'a', newline='\n') as f:
 			f.write(etcgshadowuser + '\n')
 
 	except OSError as err:
@@ -470,7 +470,7 @@ if not isroot and havehooks:
 		sys.exit(-1)
 
 	homedir  = '/root'
-	homedirFQDN = os.path.join(rootFsDir, homedir.lstrip('/'))
+	homedirFQDN = os.path.join(rootfsdir, homedir.lstrip('/'))
 
 	if not os.path.isdir(homedirFQDN):
 		print('%s[!]%s Failed to get home directory of default user in WSL: Returned path %s%s%s is not valid.' % (Fore.RED, Fore.RESET, Fore.BLUE, homedirFQDN, Fore.RESET))
