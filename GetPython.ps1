@@ -34,4 +34,5 @@ function unzip {
         [System.IO.Compression.ZipFileExtensions]::ExtractToDirectory($archive, $destinationPath)
     }
 }
+Invoke-WebRequest -o python.zip https://www.python.org/ftp/python/3.7.2/python-3.7.2.post1-embed-amd64.zip
 unzip python.zip python/
