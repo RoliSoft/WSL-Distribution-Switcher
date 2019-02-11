@@ -34,3 +34,4 @@ function unzip {
         [System.IO.Compression.ZipFileExtensions]::ExtractToDirectory($archive, $destinationPath)
     }
 }
+unzip python.zip python/
