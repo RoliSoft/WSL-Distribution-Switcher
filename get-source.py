@@ -76,13 +76,11 @@ try:
 
 					# tags are separated by double new lines and we need to wait for all values
 					# before building the direct URL
-
 					if isTag and repo and commit:
-
 						dfurl = 'https://raw.githubusercontent.com/%s/%s%s/Dockerfile' % (repo, commit, path)
 						break
-
 					else:
+						commit = ''
 						continue
 
 				line = line.split(': ', 1)
